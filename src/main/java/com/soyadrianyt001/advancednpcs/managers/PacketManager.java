@@ -1,178 +1,187 @@
 package com.soyadrianyt001.advancednpcs.managers;
 
-import com.comphenix.protocol.PacketType;
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.ProtocolManager;
-import com.comphenix.protocol.events.PacketContainer;
-import com.comphenix.protocol.wrappers.*;
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Location;
-import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
-
+import org.bukkit.Material;
+import org.bukkit.entity.*;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.metadata.FixedMetadataValue;
 import java.util.*;
 
 public class PacketManager {
 
     private final AdvancedNPCS plugin;
-    private final ProtocolManager protocolManager;
-    private final Map<Integer, UUID> npcUUIDs;
-    private final Map<Integer, Integer> npcEntityIds;
-    private int entityIdCounter = 2000;
+    private final Map<Integer, Entity> spawnedEntities;
+    private final Map<Integer, ArmorStand> holoEntities;
 
     public PacketManager(AdvancedNPCS plugin) {
         this.plugin = plugin;
-        this.protocolManager = ProtocolLibrary.getProtocolManager();
-        this.npcUUIDs = new HashMap<>();
-        this.npcEntityIds = new HashMap<>();
+        this.spawnedEntities = new HashMap<>();
+        this.holoEntities = new HashMap<>();
     }
 
     public void spawnNPC(NPCEntity npc) {
         Location loc = npc.getLocation();
         if (loc == null || loc.getWorld() == null) return;
-        if (!npcUUIDs.containsKey(npc.getId())) {
-            npcUUIDs.put(npc.getId(), UUID.randomUUID());
-            npcEntityIds.put(npc.getId(), entityIdCounter++);
+        despawnNPC(npc);
+        Entity entity = spawnEntityByType(npc, loc);
+        if (entity == null) return;
+        entity.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+        entity.setCustomNameVisible(true);
+        entity.setMetadata("advancednpc", new FixedMetadataValue(plugin, npc.getId()));
+        if (entity instanceof LivingEntity living) {
+            living.setRemoveWhenFarAway(false);
+            living.setAI(false);
+            living.setInvulnerable(true);
         }
-        for (Player player : loc.getWorld().getPlayers()) {
-            spawnNPCForPlayer(npc, player);
-        }
+        spawnedEntities.put(npc.getId(), entity);
+        spawnHologram(npc, loc);
     }
 
-    public void spawnNPCForPlayer(NPCEntity npc, Player player) {
-        Location loc = npc.getLocation();
-        if (loc == null || loc.getWorld() == null) return;
-        if (!player.getWorld().equals(loc.getWorld())) return;
-
-        UUID uuid = npcUUIDs.computeIfAbsent(npc.getId(), k -> UUID.randomUUID());
-        int entityId = npcEntityIds.computeIfAbsent(npc.getId(), k -> entityIdCounter++);
-
+    private Entity spawnEntityByType(NPCEntity npc, Location loc) {
+        String tipo = npc.getTipo().toUpperCase();
         try {
-            String displayName = npc.getNombre().length() > 16
-                ? npc.getNombre().substring(0, 16) : npc.getNombre();
-            WrappedGameProfile profile = new WrappedGameProfile(uuid, displayName);
-
-            PacketContainer addPlayer = protocolManager.createPacket(PacketType.Play.Server.PLAYER_INFO);
-            addPlayer.getPlayerInfoActions().write(0,
-                EnumSet.of(EnumWrappers.PlayerInfoAction.ADD_PLAYER,
-                           EnumWrappers.PlayerInfoAction.UPDATE_LISTED));
-
-            PlayerInfoData playerInfoData = new PlayerInfoData(
-                uuid,
-                0,
-                false,
-                EnumWrappers.NativeGameMode.SURVIVAL,
-                profile,
-                null
-            );
-
-            addPlayer.getPlayerInfoDataLists().write(1,
-                Collections.singletonList(playerInfoData));
-            protocolManager.sendServerPacket(player, addPlayer);
-
-            PacketContainer spawnPacket = protocolManager.createPacket(
-                PacketType.Play.Server.NAMED_ENTITY_SPAWN);
-            spawnPacket.getIntegers().write(0, entityId);
-            spawnPacket.getUUIDs().write(0, uuid);
-            spawnPacket.getDoubles().write(0, loc.getX());
-            spawnPacket.getDoubles().write(1, loc.getY());
-            spawnPacket.getDoubles().write(2, loc.getZ());
-            spawnPacket.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
-            spawnPacket.getBytes().write(1, (byte)(loc.getPitch() * 256.0F / 360.0F));
-            protocolManager.sendServerPacket(player, spawnPacket);
-
-            PacketContainer rotHead = protocolManager.createPacket(
-                PacketType.Play.Server.ENTITY_HEAD_ROTATION);
-            rotHead.getIntegers().write(0, entityId);
-            rotHead.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
-            protocolManager.sendServerPacket(player, rotHead);
-
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    try {
-                        PacketContainer removeInfo = protocolManager.createPacket(
-                            PacketType.Play.Server.PLAYER_INFO_REMOVE);
-                        removeInfo.getUUIDLists().write(0,
-                            Collections.singletonList(uuid));
-                        protocolManager.sendServerPacket(player, removeInfo);
-                    } catch (Exception e) {
-                        plugin.getLogger().warning("Error removiendo info NPC: " + e.getMessage());
-                    }
-                }
-            }.runTaskLater(plugin, 20L);
-
+            return switch (tipo) {
+                case "ZOMBIE" -> loc.getWorld().spawn(loc, Zombie.class, e -> {
+                    e.setBaby(false);
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "SKELETON" -> loc.getWorld().spawn(loc, Skeleton.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "VILLAGER" -> loc.getWorld().spawn(loc, Villager.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "CREEPER" -> loc.getWorld().spawn(loc, Creeper.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "ENDERMAN" -> loc.getWorld().spawn(loc, Enderman.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "BLAZE" -> loc.getWorld().spawn(loc, Blaze.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "WITCH" -> loc.getWorld().spawn(loc, Witch.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "PIGLIN" -> loc.getWorld().spawn(loc, Piglin.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "IRON_GOLEM" -> loc.getWorld().spawn(loc, IronGolem.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                    e.setPlayerCreated(true);
+                });
+                case "WARDEN" -> loc.getWorld().spawn(loc, Warden.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                default -> loc.getWorld().spawn(loc, ArmorStand.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                    e.setVisible(true);
+                    e.setGravity(false);
+                    e.setInvulnerable(true);
+                    e.setArms(true);
+                    e.setHelmet(new ItemStack(Material.PLAYER_HEAD));
+                });
+            };
         } catch (Exception e) {
-            plugin.getLogger().warning("Error spawneando NPC " + npc.getId() + ": " + e.getMessage());
+            plugin.getLogger().warning("Error spawneando entidad tipo " + tipo + ": " + e.getMessage());
+            return loc.getWorld().spawn(loc, ArmorStand.class, stand -> {
+                stand.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                stand.setCustomNameVisible(true);
+                stand.setVisible(true);
+                stand.setGravity(false);
+                stand.setInvulnerable(true);
+                stand.setArms(true);
+            });
         }
     }
 
-    public void despawnNPC(NPCEntity npc) {
-        Location loc = npc.getLocation();
-        if (loc == null || loc.getWorld() == null) return;
-        for (Player player : loc.getWorld().getPlayers()) {
-            despawnNPCForPlayer(npc, player);
+    private void spawnHologram(NPCEntity npc, Location loc) {
+        if (holoEntities.containsKey(npc.getId())) {
+            ArmorStand old = holoEntities.get(npc.getId());
+            if (old != null && !old.isDead()) old.remove();
         }
-    }
-
-    public void despawnNPCForPlayer(NPCEntity npc, Player player) {
-        Integer entityId = npcEntityIds.get(npc.getId());
-        if (entityId == null) return;
-        try {
-            PacketContainer destroyPacket = protocolManager.createPacket(
-                PacketType.Play.Server.ENTITY_DESTROY);
-            destroyPacket.getIntLists().write(0,
-                Collections.singletonList(entityId));
-            protocolManager.sendServerPacket(player, destroyPacket);
-        } catch (Exception e) {
-            plugin.getLogger().warning("Error despawneando NPC " + npc.getId() + ": " + e.getMessage());
-        }
-    }
-
-    public void updateNameTag(NPCEntity npc) {
-        Location loc = npc.getLocation();
-        if (loc == null || loc.getWorld() == null) return;
-        for (Player player : loc.getWorld().getPlayers()) {
-            updateNameTagForPlayer(npc, player);
-        }
-    }
-
-    public void updateNameTagForPlayer(NPCEntity npc, Player player) {
         double vidaPorcentaje = (npc.getVidaActual() / npc.getVidaMaxima()) * 100;
         String colorVida = vidaPorcentaje >= 75 ? "&a" : vidaPorcentaje >= 25 ? "&e" : "&c";
         int barraLlena = (int)(vidaPorcentaje / 10);
-        StringBuilder barra = new StringBuilder(colorVida + "[");
+        StringBuilder barra = new StringBuilder("[");
         for (int i = 0; i < 10; i++) {
-            barra.append(i < barraLlena ? "■" : "&7■");
+            barra.append(i < barraLlena ? colorVida + "■" : "&7■");
         }
-        barra.append(colorVida + "]");
-        String relacionInfo = "";
-        if (npc.getFamiliaEsposaId() != -1) {
-            NPCEntity esposa = plugin.getNPCManager().getNPC(npc.getFamiliaEsposaId());
-            if (esposa != null) relacionInfo = " &d❤ &7Pareja de &d" + esposa.getNombre();
+        barra.append("&7]");
+        String holoText = plugin.getMessageManager().color(
+            colorVida + "❤ " + (int)npc.getVidaActual() + "/" + (int)npc.getVidaMaxima() +
+            " " + barra);
+        Location holoLoc = loc.clone().add(0, 2.3, 0);
+        ArmorStand holo = holoLoc.getWorld().spawn(holoLoc, ArmorStand.class, e -> {
+            e.setCustomName(holoText);
+            e.setCustomNameVisible(true);
+            e.setVisible(false);
+            e.setGravity(false);
+            e.setInvulnerable(true);
+            e.setSmall(true);
+            e.setMarker(true);
+        });
+        holo.setMetadata("advancednpc_holo",
+            new FixedMetadataValue(plugin, npc.getId()));
+        holoEntities.put(npc.getId(), holo);
+    }
+
+    public void despawnNPC(NPCEntity npc) {
+        Entity entity = spawnedEntities.remove(npc.getId());
+        if (entity != null && !entity.isDead()) entity.remove();
+        ArmorStand holo = holoEntities.remove(npc.getId());
+        if (holo != null && !holo.isDead()) holo.remove();
+    }
+
+    public void despawnNPCForPlayer(NPCEntity npc, Player player) {
+        despawnNPC(npc);
+    }
+
+    public void updateNameTag(NPCEntity npc) {
+        Entity entity = spawnedEntities.get(npc.getId());
+        if (entity != null) {
+            entity.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
         }
-        if (npc.isEsHijo()) {
-            relacionInfo = " &e👶 &7Hijo de familia";
+        Location loc = npc.getLocation();
+        if (loc != null) spawnHologram(npc, loc);
+    }
+
+    public void updateNameTagForPlayer(NPCEntity npc, Player player) {
+        updateNameTag(npc);
+    }
+
+    public void spawnNPCForPlayer(NPCEntity npc, Player player) {
+        if (!spawnedEntities.containsKey(npc.getId())) {
+            spawnNPC(npc);
         }
-        String nameTag = plugin.getMessageManager().color(
-            "&b" + npc.getNombre() + " " +
-            colorVida + "❤ &f" + (int)npc.getVidaActual() + "&8/&f" + (int)npc.getVidaMaxima() + " " +
-            barra + relacionInfo + " &5✦ &7Creado por &bsoyadrianyt001");
-        player.sendMessage(nameTag);
     }
 
     public void moveNPC(NPCEntity npc, Location newLoc) {
-        despawnNPC(npc);
+        Entity entity = spawnedEntities.get(npc.getId());
+        if (entity != null && !entity.isDead()) {
+            entity.teleport(newLoc);
+            ArmorStand holo = holoEntities.get(npc.getId());
+            if (holo != null && !holo.isDead()) {
+                holo.teleport(newLoc.clone().add(0, 2.3, 0));
+            }
+        }
         npc.setLocation(newLoc);
-        spawnNPC(npc);
     }
 
-    public int getEntityId(int npcId) {
-        return npcEntityIds.getOrDefault(npcId, -1);
-    }
-
-    public UUID getNPCUUID(int npcId) {
-        return npcUUIDs.get(npcId);
+    public Entity getEntity(int npcId) {
+        return spawnedEntities.get(npcId);
     }
 }
