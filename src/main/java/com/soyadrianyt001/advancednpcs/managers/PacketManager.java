@@ -1,41 +1,31 @@
 package com.soyadrianyt001.advancednpcs.managers;
 
-import com.comphenix.protocol.PacketType;
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.ProtocolManager;
-import com.comphenix.protocol.events.PacketContainer;
-import com.comphenix.protocol.wrappers.*;
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
+import de.oliver.fancynpcs.api.FancyNpcsPlugin;
+import de.oliver.fancynpcs.api.Npc;
+import de.oliver.fancynpcs.api.NpcData;
 import org.bukkit.Location;
 import org.bukkit.entity.*;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.scheduler.BukkitRunnable;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
 public class PacketManager {
 
     private final AdvancedNPCS plugin;
-    private final ProtocolManager protocolManager;
-    private final Map<Integer, UUID> npcUUIDs;
-    private final Map<Integer, Integer> npcEntityIds;
+    private final Map<Integer, String> npcFancyIds;
     private final Map<Integer, Entity> spawnedEntities;
     private final Map<Integer, ArmorStand> holoEntities;
     private final File entityUUIDFile;
     private FileConfiguration entityUUIDConfig;
-    private int entityIdCounter = 9000;
 
     public PacketManager(AdvancedNPCS plugin) {
         this.plugin = plugin;
-        this.protocolManager = ProtocolLibrary.getProtocolManager();
-        this.npcUUIDs = new HashMap<>();
-        this.npcEntityIds = new HashMap<>();
+        this.npcFancyIds = new HashMap<>();
         this.spawnedEntities = new HashMap<>();
         this.holoEntities = new HashMap<>();
         this.entityUUIDFile = new File(plugin.getDataFolder(), "entity_uuids.yml");
@@ -51,19 +41,16 @@ public class PacketManager {
         entityUUIDConfig = YamlConfiguration.loadConfiguration(entityUUIDFile);
     }
 
-    private void saveEntityUUID(int npcId, UUID entityUUID, UUID holoUUID) {
-        if (entityUUID != null)
-            entityUUIDConfig.set("entities." + npcId + ".entity", entityUUID.toString());
-        if (holoUUID != null)
-            entityUUIDConfig.set("entities." + npcId + ".holo", holoUUID.toString());
+    private void saveNPCId(int npcId, String fancyId) {
+        entityUUIDConfig.set("fancy." + npcId, fancyId);
         try { entityUUIDConfig.save(entityUUIDFile); }
-        catch (IOException e) { plugin.getLogger().warning("Error guardando UUIDs."); }
+        catch (IOException e) { plugin.getLogger().warning("Error guardando IDs."); }
     }
 
-    private void removeEntityUUID(int npcId) {
-        entityUUIDConfig.set("entities." + npcId, null);
+    private void removeNPCId(int npcId) {
+        entityUUIDConfig.set("fancy." + npcId, null);
         try { entityUUIDConfig.save(entityUUIDFile); }
-        catch (IOException e) { plugin.getLogger().warning("Error removiendo UUID."); }
+        catch (IOException e) { plugin.getLogger().warning("Error removiendo ID."); }
     }
 
     public void cleanupOldEntities() {
@@ -78,162 +65,7 @@ public class PacketManager {
                 }
             }
         }
-        entityUUIDConfig.set("entities", null);
-        try { entityUUIDConfig.save(entityUUIDFile); }
-        catch (IOException ignored) {}
         plugin.getLogger().info("Eliminadas " + count + " entidades antiguas.");
-    }
-
-    private void addTextureToProfile(WrappedGameProfile gameProfile, String skinUrl) {
-        try {
-            String base64 = Base64.getEncoder().encodeToString(
-                ("{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}").getBytes());
-            gameProfile.getProperties().put("textures",
-                new WrappedSignedProperty("textures", base64, ""));
-            plugin.getLogger().info("Textura aplicada correctamente al NPC.");
-        } catch (Exception e) {
-            plugin.getLogger().warning("Error textura: " + e.getMessage());
-        }
-    }
-
-    private void spawnPlayerNPC(NPCEntity npc, Location loc) {
-        plugin.getSkinManager().getSkinProfile(npc.getSkin(), profile -> {
-            UUID uuid = UUID.randomUUID();
-            int entityId = entityIdCounter++;
-            npcUUIDs.put(npc.getId(), uuid);
-            npcEntityIds.put(npc.getId(), entityId);
-            String displayName = npc.getNombre().length() > 16
-                ? npc.getNombre().substring(0, 16) : npc.getNombre();
-            WrappedGameProfile gameProfile = new WrappedGameProfile(uuid, displayName);
-            if (profile != null) {
-                try {
-                    org.bukkit.profile.PlayerTextures textures = profile.getTextures();
-                    if (textures.getSkin() != null) {
-                        addTextureToProfile(gameProfile, textures.getSkin().toString());
-                    }
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Error obteniendo textura: " + e.getMessage());
-                }
-            }
-            for (org.bukkit.entity.Player player : loc.getWorld().getPlayers()) {
-                sendPlayerNPCPackets(npc, player, uuid, entityId, gameProfile, loc);
-            }
-            ArmorStand holo = spawnHologram(npc, loc);
-            saveEntityUUID(npc.getId(), uuid,
-                holo != null ? holo.getUniqueId() : null);
-        });
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void setPlayerInfoActions(PacketContainer packet, String... actionNames) {
-        try {
-            Object nmsPacket = packet.getHandle();
-            for (Field field : nmsPacket.getClass().getDeclaredFields()) {
-                if (field.getType() == EnumSet.class) {
-                    field.setAccessible(true);
-                    Class<?> enumType = null;
-                    if (field.getGenericType() instanceof ParameterizedType pt) {
-                        enumType = (Class<?>) pt.getActualTypeArguments()[0];
-                    }
-                    if (enumType != null && enumType.isEnum()) {
-                        EnumSet nmsActions = EnumSet.noneOf((Class<Enum>) enumType);
-                        for (Object constant : enumType.getEnumConstants()) {
-                            String name = ((Enum<?>) constant).name();
-                            for (String actionName : actionNames) {
-                                if (name.equals(actionName)) {
-                                    nmsActions.add((Enum) constant);
-                                }
-                            }
-                        }
-                        field.set(nmsPacket, nmsActions);
-                    }
-                    break;
-                }
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("Error seteando actions: " + e.getMessage());
-        }
-    }
-
-    private void sendPlayerNPCPackets(NPCEntity npc, org.bukkit.entity.Player player,
-                                       UUID uuid, int entityId,
-                                       WrappedGameProfile gameProfile, Location loc) {
-        try {
-            PacketContainer addInfo = protocolManager.createPacket(
-                PacketType.Play.Server.PLAYER_INFO);
-            setPlayerInfoActions(addInfo, "ADD_PLAYER", "UPDATE_LISTED");
-            PlayerInfoData infoData = new PlayerInfoData(
-                uuid, 0, false,
-                EnumWrappers.NativeGameMode.SURVIVAL,
-                gameProfile,
-                WrappedChatComponent.fromText(npc.getNombre()),
-                (WrappedRemoteChatSessionData) null);
-            addInfo.getPlayerInfoDataLists().write(1,
-                Collections.singletonList(infoData));
-            protocolManager.sendServerPacket(player, addInfo);
-
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                try {
-                    PacketContainer spawnPacket = protocolManager.createPacket(
-                        PacketType.Play.Server.SPAWN_ENTITY);
-                    spawnPacket.getIntegers().write(0, entityId);
-                    spawnPacket.getUUIDs().write(0, uuid);
-                    spawnPacket.getEntityTypeModifier().write(0,
-                        org.bukkit.entity.EntityType.PLAYER);
-                    spawnPacket.getDoubles().write(0, loc.getX());
-                    spawnPacket.getDoubles().write(1, loc.getY());
-                    spawnPacket.getDoubles().write(2, loc.getZ());
-                    spawnPacket.getBytes().write(0,
-                        (byte)(loc.getYaw() * 256.0F / 360.0F));
-                    spawnPacket.getBytes().write(1,
-                        (byte)(loc.getPitch() * 256.0F / 360.0F));
-                    protocolManager.sendServerPacket(player, spawnPacket);
-
-                    PacketContainer rotHead = protocolManager.createPacket(
-                        PacketType.Play.Server.ENTITY_HEAD_ROTATION);
-                    rotHead.getIntegers().write(0, entityId);
-                    rotHead.getBytes().write(0,
-                        (byte)(loc.getYaw() * 256.0F / 360.0F));
-                    protocolManager.sendServerPacket(player, rotHead);
-
-                    List<WrappedDataValue> dataValues = new ArrayList<>();
-                    dataValues.add(new WrappedDataValue(
-                        17,
-                        WrappedDataWatcher.Registry.get(Byte.class),
-                        (byte) 127
-                    ));
-                    PacketContainer metadata = protocolManager.createPacket(
-                        PacketType.Play.Server.ENTITY_METADATA);
-                    metadata.getIntegers().write(0, entityId);
-                    metadata.getDataValueCollectionModifier().write(0, dataValues);
-                    protocolManager.sendServerPacket(player, metadata);
-
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Error spawn NPC player: " + e.getMessage());
-                    e.printStackTrace();
-                }
-            }, 2L);
-
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    try {
-                        PacketContainer removeInfo = protocolManager.createPacket(
-                            PacketType.Play.Server.PLAYER_INFO_REMOVE);
-                        removeInfo.getUUIDLists().write(0,
-                            Collections.singletonList(uuid));
-                        protocolManager.sendServerPacket(player, removeInfo);
-                    } catch (Exception e) {
-                        plugin.getLogger().warning("Error removiendo info: " + e.getMessage());
-                    }
-                }
-            }.runTaskLater(plugin, 100L);
-
-        } catch (Exception e) {
-            plugin.getLogger().warning("Error enviando packets NPC "
-                + npc.getId() + ": " + e.getMessage());
-            e.printStackTrace();
-        }
     }
 
     public void spawnNPC(NPCEntity npc) {
@@ -242,9 +74,32 @@ public class PacketManager {
         despawnNPC(npc);
         String tipo = npc.getTipo().toUpperCase();
         if (tipo.equals("PLAYER")) {
-            spawnPlayerNPC(npc, loc);
+            spawnFancyNPC(npc, loc);
         } else {
             spawnMobNPC(npc, loc);
+        }
+    }
+
+    private void spawnFancyNPC(NPCEntity npc, Location loc) {
+        try {
+            String fancyId = "advancednpc_" + npc.getId();
+            NpcData data = new NpcData(fancyId, npc.getSkin(), loc);
+            data.setDisplayName(plugin.getMessageManager().color(
+                "&b" + npc.getNombre()));
+            data.setShowInTab(false);
+            data.setSpawnEntity(EntityType.PLAYER);
+            data.setTurnToPlayer(true);
+            data.setGlowing(false);
+            Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().create(data);
+            FancyNpcsPlugin.get().getNpcAdapter().register(fancyNpc);
+            fancyNpc.spawnForAll();
+            npcFancyIds.put(npc.getId(), fancyId);
+            saveNPCId(npc.getId(), fancyId);
+            spawnHologram(npc, loc);
+            plugin.getLogger().info("NPC jugador creado con FancyNPCs: " + fancyId);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Error creando FancyNPC: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -260,9 +115,7 @@ public class PacketManager {
             living.setInvulnerable(true);
         }
         spawnedEntities.put(npc.getId(), entity);
-        ArmorStand holo = spawnHologram(npc, loc);
-        saveEntityUUID(npc.getId(), entity.getUniqueId(),
-            holo != null ? holo.getUniqueId() : null);
+        spawnHologram(npc, loc);
     }
 
     private Entity spawnEntityByType(NPCEntity npc, Location loc) {
@@ -385,48 +238,51 @@ public class PacketManager {
     }
 
     public void despawnNPC(NPCEntity npc) {
-        Integer entityId = npcEntityIds.remove(npc.getId());
-        UUID uuid = npcUUIDs.remove(npc.getId());
-        if (entityId != null) {
-            for (org.bukkit.entity.Player player : plugin.getServer().getOnlinePlayers()) {
-                try {
-                    PacketContainer destroy = protocolManager.createPacket(
-                        PacketType.Play.Server.ENTITY_DESTROY);
-                    destroy.getIntLists().write(0, Collections.singletonList(entityId));
-                    protocolManager.sendServerPacket(player, destroy);
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Error destruyendo NPC: " + e.getMessage());
+        String fancyId = npcFancyIds.remove(npc.getId());
+        if (fancyId != null) {
+            try {
+                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                if (fancyNpc != null) {
+                    fancyNpc.removeForAll();
+                    FancyNpcsPlugin.get().getNpcAdapter().remove(fancyNpc);
                 }
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error removiendo FancyNPC: " + e.getMessage());
             }
         }
         Entity entity = spawnedEntities.remove(npc.getId());
         if (entity != null && !entity.isDead()) entity.remove();
         ArmorStand holo = holoEntities.remove(npc.getId());
         if (holo != null && !holo.isDead()) holo.remove();
-        removeEntityUUID(npc.getId());
+        removeNPCId(npc.getId());
     }
 
-    public void despawnNPCForPlayer(NPCEntity npc, org.bukkit.entity.Player player) {
-        Integer entityId = npcEntityIds.get(npc.getId());
-        if (entityId != null) {
+    public void despawnNPCForPlayer(NPCEntity npc, Player player) {
+        String fancyId = npcFancyIds.get(npc.getId());
+        if (fancyId != null) {
             try {
-                PacketContainer destroy = protocolManager.createPacket(
-                    PacketType.Play.Server.ENTITY_DESTROY);
-                destroy.getIntLists().write(0, Collections.singletonList(entityId));
-                protocolManager.sendServerPacket(player, destroy);
+                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                if (fancyNpc != null) fancyNpc.removeForPlayer(player);
             } catch (Exception e) {
-                plugin.getLogger().warning("Error destruyendo NPC: " + e.getMessage());
+                plugin.getLogger().warning("Error removiendo FancyNPC: " + e.getMessage());
             }
-        }
-        Entity entity = spawnedEntities.get(npc.getId());
-        if (entity != null && !entity.isDead()) {
-            entity.setMetadata("temp_hidden",
-                new FixedMetadataValue(plugin, true));
         }
     }
 
     public void despawnAll() {
         plugin.getLogger().info("Eliminando todas las entidades de AdvancedNPCS...");
+        for (String fancyId : new ArrayList<>(npcFancyIds.values())) {
+            try {
+                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                if (fancyNpc != null) {
+                    fancyNpc.removeForAll();
+                    FancyNpcsPlugin.get().getNpcAdapter().remove(fancyNpc);
+                }
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error removiendo FancyNPC: " + e.getMessage());
+            }
+        }
+        npcFancyIds.clear();
         for (Entity entity : new ArrayList<>(spawnedEntities.values())) {
             if (entity != null && !entity.isDead()) entity.remove();
         }
@@ -435,8 +291,6 @@ public class PacketManager {
             if (holo != null && !holo.isDead()) holo.remove();
         }
         holoEntities.clear();
-        npcUUIDs.clear();
-        npcEntityIds.clear();
         for (org.bukkit.World world : plugin.getServer().getWorlds()) {
             for (Entity entity : new ArrayList<>(world.getEntities())) {
                 if (entity.hasMetadata("advancednpc") ||
@@ -445,27 +299,25 @@ public class PacketManager {
                 }
             }
         }
-        entityUUIDConfig.set("entities", null);
-        try { entityUUIDConfig.save(entityUUIDFile); }
-        catch (IOException ignored) {}
         plugin.getLogger().info("Todas las entidades eliminadas correctamente.");
     }
 
-    public void spawnNPCForPlayer(NPCEntity npc, org.bukkit.entity.Player player) {
+    public void spawnNPCForPlayer(NPCEntity npc, Player player) {
         Location loc = npc.getLocation();
         if (loc == null) return;
         if (!player.getWorld().getName().equals(npc.getMundo())) return;
         String tipo = npc.getTipo().toUpperCase();
         if (tipo.equals("PLAYER")) {
-            UUID uuid = npcUUIDs.get(npc.getId());
-            Integer entityId = npcEntityIds.get(npc.getId());
-            if (uuid != null && entityId != null) {
-                String displayName = npc.getNombre().length() > 16
-                    ? npc.getNombre().substring(0, 16) : npc.getNombre();
-                WrappedGameProfile gameProfile = new WrappedGameProfile(uuid, displayName);
-                sendPlayerNPCPackets(npc, player, uuid, entityId, gameProfile, loc);
+            String fancyId = npcFancyIds.get(npc.getId());
+            if (fancyId != null) {
+                try {
+                    Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                    if (fancyNpc != null) fancyNpc.spawnForPlayer(player);
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Error spawneando FancyNPC: " + e.getMessage());
+                }
             } else {
-                spawnPlayerNPC(npc, loc);
+                spawnFancyNPC(npc, loc);
             }
         } else {
             if (!spawnedEntities.containsKey(npc.getId())) {
@@ -475,6 +327,19 @@ public class PacketManager {
     }
 
     public void updateNameTag(NPCEntity npc) {
+        String fancyId = npcFancyIds.get(npc.getId());
+        if (fancyId != null) {
+            try {
+                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                if (fancyNpc != null) {
+                    fancyNpc.getData().setDisplayName(
+                        plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    fancyNpc.updateForAll();
+                }
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error actualizando FancyNPC: " + e.getMessage());
+            }
+        }
         Entity entity = spawnedEntities.get(npc.getId());
         if (entity != null) {
             entity.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
@@ -483,44 +348,28 @@ public class PacketManager {
         if (loc != null) spawnHologram(npc, loc);
     }
 
-    public void updateNameTagForPlayer(NPCEntity npc, org.bukkit.entity.Player player) {
+    public void updateNameTagForPlayer(NPCEntity npc, Player player) {
         updateNameTag(npc);
     }
 
     public void moveNPC(NPCEntity npc, Location newLoc) {
-        String tipo = npc.getTipo().toUpperCase();
-        if (tipo.equals("PLAYER")) {
-            Integer entityId = npcEntityIds.get(npc.getId());
-            if (entityId != null) {
-                for (org.bukkit.entity.Player player : plugin.getServer().getOnlinePlayers()) {
-                    if (!player.getWorld().getName().equals(npc.getMundo())) continue;
-                    try {
-                        PacketContainer teleport = protocolManager.createPacket(
-                            PacketType.Play.Server.ENTITY_TELEPORT);
-                        teleport.getIntegers().write(0, entityId);
-                        teleport.getDoubles().write(0, newLoc.getX());
-                        teleport.getDoubles().write(1, newLoc.getY());
-                        teleport.getDoubles().write(2, newLoc.getZ());
-                        teleport.getBytes().write(0,
-                            (byte)(newLoc.getYaw() * 256.0F / 360.0F));
-                        teleport.getBytes().write(1,
-                            (byte)(newLoc.getPitch() * 256.0F / 360.0F));
-                        teleport.getBooleans().write(0, false);
-                        protocolManager.sendServerPacket(player, teleport);
-                    } catch (Exception e) {
-                        plugin.getLogger().warning("Error moviendo NPC: " + e.getMessage());
-                    }
+        String fancyId = npcFancyIds.get(npc.getId());
+        if (fancyId != null) {
+            try {
+                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                if (fancyNpc != null) {
+                    fancyNpc.getData().setLocation(newLoc);
+                    fancyNpc.updateForAll();
                 }
-            }
-        } else {
-            Entity entity = spawnedEntities.get(npc.getId());
-            if (entity != null && !entity.isDead()) {
-                entity.teleport(newLoc);
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error moviendo FancyNPC: " + e.getMessage());
             }
         }
+        Entity entity = spawnedEntities.get(npc.getId());
+        if (entity != null && !entity.isDead()) entity.teleport(newLoc);
         ArmorStand holo = holoEntities.get(npc.getId());
         if (holo != null && !holo.isDead()) {
-            double holoHeight = tipo.equals("PLAYER") ? 2.4 : 2.3;
+            double holoHeight = npc.getTipo().equalsIgnoreCase("PLAYER") ? 2.4 : 2.3;
             holo.teleport(newLoc.clone().add(0, holoHeight, 0));
         }
         npc.setLocation(newLoc);
