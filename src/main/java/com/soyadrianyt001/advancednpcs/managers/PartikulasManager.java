@@ -84,7 +84,7 @@ public class PartikulasManager {
     }
 
     public void spawnBurstEffect(Location loc, Particle particle, int count) {
-        if (loc.getWorld() == null) return;
+        if (loc == null || loc.getWorld() == null) return;
         loc.getWorld().spawnParticle(particle, loc.clone().add(0, 1, 0),
             count, 0.5, 0.5, 0.5, 0.1);
     }
@@ -98,6 +98,6 @@ public class PartikulasManager {
     }
 
     public void spawnPoisonEffect(Location loc) {
-        spawnBurstEffect(loc, Particle.SPELL_MOB, 15);
+        spawnBurstEffect(loc, Particle.WITCH, 15);
     }
 }
