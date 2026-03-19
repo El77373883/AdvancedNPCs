@@ -3,6 +3,7 @@ package com.soyadrianyt001.advancednpcs.managers;
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -36,10 +37,18 @@ public class NPCManager {
         }
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             for (NPCEntity npc : npcs.values()) {
+                if (npc.getMundo() == null) continue;
+                World world = plugin.getServer().getWorld(npc.getMundo());
+                if (world == null) {
+                    plugin.getLogger().warning("Mundo '" + npc.getMundo() +
+                        "' del NPC #" + npc.getId() +
+                        " no encontrado. Asegurate de que Multiverse lo tenga cargado.");
+                    continue;
+                }
                 spawnNPCEntity(npc);
             }
             plugin.getLogger().info("Cargados " + npcs.size() + " NPCs.");
-        }, 20L);
+        }, 40L);
     }
 
     public NPCEntity createNPC(String nombre, Location location, Player creator) {
@@ -58,7 +67,9 @@ public class NPCManager {
         npc.saveToConfig();
         npcs.put(id, npc);
         updateRegistro(id, nombre);
-        plugin.getLogManager().log(id, "NPC #" + id + " creado por " + creator.getName());
+        plugin.getLogManager().log(id, "NPC #" + id +
+            " creado por " + creator.getName() +
+            " en mundo " + location.getWorld().getName());
         return npc;
     }
 
@@ -91,8 +102,20 @@ public class NPCManager {
         return new ArrayList<>(npcs.values());
     }
 
+    public List<NPCEntity> getNPCsByWorld(String worldName) {
+        List<NPCEntity> result = new ArrayList<>();
+        for (NPCEntity npc : npcs.values()) {
+            if (worldName.equals(npc.getMundo())) result.add(npc);
+        }
+        return result;
+    }
+
     public int getTotalNPCs() {
         return npcs.size();
+    }
+
+    public int getTotalNPCsByWorld(String worldName) {
+        return getNPCsByWorld(worldName).size();
     }
 
     public boolean exists(int id) {
