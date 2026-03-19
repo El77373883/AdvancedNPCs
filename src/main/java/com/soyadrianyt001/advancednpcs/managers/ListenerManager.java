@@ -1,9 +1,9 @@
 package com.soyadrianyt001.advancednpcs.managers;
 
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
+import com.soyadrianyt001.advancednpcs.gui.GUIListener;
 import com.soyadrianyt001.advancednpcs.listeners.ChatListener;
 import com.soyadrianyt001.advancednpcs.listeners.CombateListener;
-import com.soyadrianyt001.advancednpcs.listeners.GUIListener;
 import com.soyadrianyt001.advancednpcs.listeners.NPCListener;
 import com.soyadrianyt001.advancednpcs.listeners.PlayerListener;
 
