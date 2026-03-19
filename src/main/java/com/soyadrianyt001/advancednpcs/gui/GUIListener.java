@@ -25,46 +25,50 @@ public class GUIListener implements Listener {
         if (event.getCurrentItem() == null) return;
         if (event.getCurrentItem().getType() == Material.AIR) return;
 
-        String title = ChatColor.stripColor(event.getView().getTitle());
+        String title = event.getView().getTitle();
+        String titleStripped = ChatColor.stripColor(title);
 
-        if (title.contains("AdvancedNPCS") && title.contains("Premium")) {
+        if (titleStripped.contains("AdvancedNPCS") && titleStripped.contains("Premium")) {
             event.setCancelled(true);
-            handlePanelClick(player, event.getSlot(), event.getCurrentItem(), title);
+            handlePanelClick(player, event.getSlot(), event.getCurrentItem(), titleStripped);
             return;
         }
-        if (title.contains("NPC #") && title.contains("Config")) {
+        if (titleStripped.contains("NPC #") && titleStripped.contains("Config")) {
             event.setCancelled(true);
-            handleConfigClick(player, event.getSlot(), event.getCurrentItem(), title);
+            handleConfigClick(player, event.getSlot(), event.getCurrentItem(), titleStripped);
             return;
         }
-        if (title.contains("Profesion del NPC")) {
+        if (titleStripped.contains("Profesion del NPC")) {
             event.setCancelled(true);
             handleProfesionClick(player, event.getSlot(), event.getCurrentItem());
             return;
         }
-        if (title.contains("Modo del NPC")) {
+        if (titleStripped.contains("Modo del NPC")) {
             event.setCancelled(true);
             handleModoClick(player, event.getSlot(), event.getCurrentItem());
             return;
         }
-        if (title.contains("Confirmar") || title.contains("seguro")) {
+        if (title.contains("⚠") || titleStripped.contains("Confirmar") ||
+            titleStripped.contains("seguro") || titleStripped.contains("Eliminar NPC") ||
+            titleStripped.contains("Mover NPC") || titleStripped.contains("Asignar") ||
+            titleStripped.contains("Cambiar Modo")) {
             event.setCancelled(true);
             handleConfirmClick(player, event.getSlot(), event.getCurrentItem());
             return;
         }
-        if (title.contains("Tienda de")) {
+        if (titleStripped.contains("Tienda de")) {
             event.setCancelled(true);
-            handleTiendaClick(player, event.getSlot(), event.getCurrentItem(), title);
+            handleTiendaClick(player, event.getSlot(), event.getCurrentItem(), titleStripped);
             return;
         }
-        if (title.contains("Interacciones Familiares")) {
+        if (titleStripped.contains("Interacciones Familiares")) {
             event.setCancelled(true);
             handleInteraccionClick(player, event.getSlot(), event.getCurrentItem());
             return;
         }
-        if (title.contains("Constructor")) {
+        if (titleStripped.contains("Constructor")) {
             event.setCancelled(true);
-            handleConstruirClick(player, event.getSlot(), event.getCurrentItem(), title);
+            handleConstruirClick(player, event.getSlot(), event.getCurrentItem(), titleStripped);
             return;
         }
     }
@@ -138,7 +142,7 @@ public class GUIListener implements Listener {
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&7Escribe el nuevo &enombre &7del NPC en el chat&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "&7Escribe el nuevo nombre del NPC:", nombre -> {
+                    "&7Escribe el nuevo nombre:", nombre -> {
                         npc.setNombre(nombre);
                         npc.saveToConfig();
                         plugin.getPacketManager().updateNameTag(npc);
@@ -152,9 +156,9 @@ public class GUIListener implements Listener {
             case 12 -> {
                 player.closeInventory();
                 plugin.getMessageManager().sendWithPrefix(player,
-                    "&7Escribe el nombre del jugador para la &dskin &7en el chat&8:");
+                    "&7Escribe el nombre del jugador para la &dskin&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "&7Escribe el nombre del jugador para la skin:", skinName -> {
+                    "&7Escribe la skin:", skinName -> {
                         npc.setSkin(skinName);
                         npc.saveToConfig();
                         npc.respawn();
@@ -172,28 +176,24 @@ public class GUIListener implements Listener {
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&7Escribe el dialogo del NPC en el chat&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "&7Escribe el dialogo:", dialogo -> {
+                    "&7Dialogo:", dialogo -> {
                         org.bukkit.configuration.file.FileConfiguration config =
                             plugin.getDataManager().getNPCConfig(npc.getId());
                         config.set("dialogo", dialogo);
                         plugin.getDataManager().saveNPCConfig(npc.getId(), config);
                         plugin.getMessageManager().sendWithPrefix(player,
-                            "&a✔ &7Dialogo guardado&8: &7" + dialogo);
+                            "&a✔ &7Dialogo guardado.");
                         new ConfigGUI(plugin, npc).open(player);
                     });
             }
             case 16 -> {
                 player.closeInventory();
                 plugin.getMessageManager().sendWithPrefix(player,
-                    "&7Escribe el tipo de particula&8:");
-                plugin.getMessageManager().sendWithPrefix(player,
                     "&7Tipos&8: &eHEART&7, &eCRIT&7, &eSNOWFLAKE&7, &eWITCH&7, &eFLAME&7, &eCLOUD");
                 plugin.getMessageManager().sendWithPrefix(player,
-                    "&7Modo&8: &eNORMAL&7, &eAURA&7, &eCORONA&7, &eRASTRO");
-                plugin.getMessageManager().sendWithPrefix(player,
-                    "&7Ejemplo&8: &eHEART:AURA &7o &eFLAME:CORONA");
+                    "&7Modo&8: &eNORMAL&7, &eAURA&7, &eCORONA&7, &eRASTRO &8- &7Ej&8: &eHEART:AURA");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "&7Escribe la particula:", particulaStr -> {
+                    "&7Particula:", particulaStr -> {
                         try {
                             String[] parts = particulaStr.split(":");
                             org.bukkit.Particle.valueOf(parts[0].toUpperCase());
@@ -203,13 +203,12 @@ public class GUIListener implements Listener {
                             plugin.getParticulasManager().stopParticles(npc);
                             plugin.getParticulasManager().startParticles(npc);
                             plugin.getMessageManager().sendWithPrefix(player,
-                                "&a✔ &7Particula activada&8: &e" +
-                                particulaStr.toUpperCase());
+                                "&a✔ &7Particula activada&8: &e" + particulaStr.toUpperCase());
                             player.playSound(player.getLocation(),
                                 org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
                         } catch (Exception e) {
                             plugin.getMessageManager().sendWithPrefix(player,
-                                "&cParticula invalida. Usa nombres como HEART, CRIT, FLAME");
+                                "&cParticula invalida. Ej: HEART, FLAME, CRIT");
                         }
                         new ConfigGUI(plugin, npc).open(player);
                     });
@@ -217,9 +216,9 @@ public class GUIListener implements Listener {
             case 20 -> {
                 player.closeInventory();
                 plugin.getMessageManager().sendWithPrefix(player,
-                    "&7Escribe la escala &8(0.1 - 5.0) &7en el chat&8:");
+                    "&7Escribe la escala &8(0.1 - 5.0)&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "&7Escribe la nueva escala (0.1 - 5.0):", escalaStr -> {
+                    "&7Escala:", escalaStr -> {
                         try {
                             double escala = Double.parseDouble(escalaStr);
                             escala = Math.max(0.1, Math.min(5.0, escala));
@@ -232,7 +231,7 @@ public class GUIListener implements Listener {
                                 org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
                         } catch (NumberFormatException e) {
                             plugin.getMessageManager().sendWithPrefix(player,
-                                "&cEscala invalida. Usa numeros como 1.0 o 2.5");
+                                "&cEscala invalida. Ej: 1.0 o 2.5");
                         }
                         new ConfigGUI(plugin, npc).open(player);
                     });
@@ -314,7 +313,11 @@ public class GUIListener implements Listener {
             plugin.getMessageManager().sendWithPrefix(player,
                 "&7Caminar&8: " +
                 (npc.isCaminarActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
-            plugin.getTrabajoManager().startTrabajo(npc);
+            if (npc.isCaminarActivo()) {
+                plugin.getTrabajoManager().startCaminarNatural(npc);
+            } else {
+                plugin.getTrabajoManager().stopTrabajo(npc);
+            }
             new ProfesionGUI(plugin, npc).open(player);
             return;
         }
@@ -360,11 +363,14 @@ public class GUIListener implements Listener {
         player.playSound(player.getLocation(),
             org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
 
-        if (modo.equals("VIDA_PROPIA")) {
-            plugin.getTrabajoManager().startCaminarNatural(npc);
-        } else if (modo.equals("GUARDAESPALDAS") || modo.equals("COMBATE")) {
-            plugin.getTrabajoManager().startTrabajo(npc);
-        }
+        plugin.getTrabajoManager().stopTrabajo(npc);
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            switch (modo) {
+                case "VIDA_PROPIA" -> plugin.getTrabajoManager().startCaminarNatural(npc);
+                case "GUARDAESPALDAS", "COMBATE", "POLICIA" ->
+                    plugin.getTrabajoManager().startTrabajo(npc);
+            }
+        }, 5L);
 
         new ConfigGUI(plugin, npc).open(player);
     }
