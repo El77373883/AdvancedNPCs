@@ -116,7 +116,7 @@ public class PacketManager {
                             new WrappedSignedProperty("textures", base64, ""));
                     }
                 } catch (Exception e) {
-                    plugin.getLogger().warning("Error aplicando textura al NPC: " + e.getMessage());
+                    plugin.getLogger().warning("Error aplicando textura: " + e.getMessage());
                 }
             }
             for (org.bukkit.entity.Player player : loc.getWorld().getPlayers()) {
@@ -168,10 +168,10 @@ public class PacketManager {
             protocolManager.sendServerPacket(player, rotHead);
 
             WrappedDataWatcher watcher = new WrappedDataWatcher();
-            WrappedDataWatcher.WrappedDataWatcherObject skinObj =
+            WrappedDataWatcher.WrappedDataWatcherObject skinLayersObj =
                 new WrappedDataWatcher.WrappedDataWatcherObject(
                     17, WrappedDataWatcher.Registry.get(Byte.class));
-            watcher.setObject(skinObj, (byte) 127);
+            watcher.setObject(skinLayersObj, (byte) 127);
             PacketContainer metadata = protocolManager.createPacket(
                 PacketType.Play.Server.ENTITY_METADATA);
             metadata.getIntegers().write(0, entityId);
@@ -189,14 +189,15 @@ public class PacketManager {
                             Collections.singletonList(uuid));
                         protocolManager.sendServerPacket(player, removeInfo);
                     } catch (Exception e) {
-                        plugin.getLogger().warning("Error removiendo info NPC: " + e.getMessage());
+                        plugin.getLogger().warning("Error removiendo info: " + e.getMessage());
                     }
                 }
-            }.runTaskLater(plugin, 40L);
+            }.runTaskLater(plugin, 60L);
 
         } catch (Exception e) {
-            plugin.getLogger().warning("Error enviando packets NPC " + npc.getId()
-                + ": " + e.getMessage());
+            plugin.getLogger().warning("Error enviando packets NPC "
+                + npc.getId() + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -370,6 +371,10 @@ public class PacketManager {
                 plugin.getLogger().warning("Error destruyendo NPC: " + e.getMessage());
             }
         }
+        Entity entity = spawnedEntities.get(npc.getId());
+        if (entity != null && !entity.isDead()) {
+            entity.setMetadata("temp_hidden", new FixedMetadataValue(plugin, true));
+        }
     }
 
     public void despawnAll() {
@@ -401,6 +406,7 @@ public class PacketManager {
     public void spawnNPCForPlayer(NPCEntity npc, org.bukkit.entity.Player player) {
         Location loc = npc.getLocation();
         if (loc == null) return;
+        if (!player.getWorld().getName().equals(npc.getMundo())) return;
         String tipo = npc.getTipo().toUpperCase();
         if (tipo.equals("PLAYER")) {
             UUID uuid = npcUUIDs.get(npc.getId());
@@ -410,6 +416,12 @@ public class PacketManager {
                     ? npc.getNombre().substring(0, 16) : npc.getNombre();
                 WrappedGameProfile gameProfile = new WrappedGameProfile(uuid, displayName);
                 sendPlayerNPCPackets(npc, player, uuid, entityId, gameProfile, loc);
+            } else {
+                spawnPlayerNPC(npc, loc);
+            }
+        } else {
+            if (!spawnedEntities.containsKey(npc.getId())) {
+                spawnMobNPC(npc, loc);
             }
         }
     }
@@ -433,6 +445,7 @@ public class PacketManager {
             Integer entityId = npcEntityIds.get(npc.getId());
             if (entityId != null) {
                 for (org.bukkit.entity.Player player : plugin.getServer().getOnlinePlayers()) {
+                    if (!player.getWorld().getName().equals(npc.getMundo())) continue;
                     try {
                         PacketContainer teleport = protocolManager.createPacket(
                             PacketType.Play.Server.ENTITY_TELEPORT);
