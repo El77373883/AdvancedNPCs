@@ -28,8 +28,12 @@
             <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
         </repository>
         <repository>
-            <id>minecraft-libraries</id>
-            <url>https://libraries.minecraft.net/</url>
+            <id>fancyplugins-releases</id>
+            <url>https://repo.fancyplugins.de/releases</url>
+        </repository>
+        <repository>
+            <id>skinsrestorer-repo</id>
+            <url>https://repo.skinsrestorer.net/releases</url>
         </repository>
     </repositories>
     <dependencies>
@@ -51,17 +55,16 @@
             <version>2.11.6</version>
             <scope>provided</scope>
         </dependency>
-        <!-- ✅ CORREGIDO: nuevo groupId net.dmulloy2 en Maven Central -->
         <dependency>
-            <groupId>net.dmulloy2</groupId>
-            <artifactId>ProtocolLib</artifactId>
-            <version>5.4.0</version>
+            <groupId>de.oliver</groupId>
+            <artifactId>FancyNpcs</artifactId>
+            <version>2.4.1</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.mojang</groupId>
-            <artifactId>authlib</artifactId>
-            <version>6.0.54</version>
+            <groupId>net.skinsrestorer</groupId>
+            <artifactId>skinsrestorer-api</artifactId>
+            <version>15.4.1</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
