@@ -2,11 +2,11 @@ package com.soyadrianyt001.advancednpcs.listeners;
 
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
+import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
 
 public class CombateListener implements Listener {
 
@@ -51,7 +51,7 @@ public class CombateListener implements Listener {
         plugin.getLogManager().log(npc.getId(),
             npc.getNombre() + " murio. Matado por: " + killer.getName());
         plugin.getParticulasManager().spawnBurstEffect(
-            npc.getLocation(), org.bukkit.Particle.EXPLOSION_LARGE, 5);
+            npc.getLocation(), Particle.EXPLOSION, 5);
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             npc.setVidaActual(npc.getVidaMaxima());
             npc.saveToConfig();
