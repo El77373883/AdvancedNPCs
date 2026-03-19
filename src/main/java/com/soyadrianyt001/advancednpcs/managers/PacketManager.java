@@ -5,14 +5,22 @@ import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import de.oliver.fancynpcs.api.FancyNpcsPlugin;
 import de.oliver.fancynpcs.api.Npc;
 import de.oliver.fancynpcs.api.NpcData;
+import de.oliver.fancynpcs.api.utils.NpcEquipmentSlot;
+import de.oliver.fancynpcs.api.utils.SkinFetcher;
+import de.oliver.fancynpcs.api.actions.ActionTrigger;
+import de.oliver.fancynpcs.api.actions.NpcAction;
+import de.oliver.fancynpcs.api.NpcAttribute;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.entity.*;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Consumer;
 
 public class PacketManager {
 
@@ -83,18 +91,33 @@ public class PacketManager {
     private void spawnFancyNPC(NPCEntity npc, Location loc) {
         try {
             String fancyId = "advancednpc_" + npc.getId();
+            String displayName = plugin.getMessageManager().color("&b" + npc.getNombre());
+            SkinFetcher.SkinData skinData = new SkinFetcher.SkinData(
+                npc.getSkin(), "", ""
+            );
             NpcData data = new NpcData(
                 fancyId,
                 UUID.randomUUID(),
-                npc.getNombre(),
-                loc
+                displayName,
+                skinData,
+                loc,
+                false,
+                false,
+                false,
+                false,
+                null,
+                EntityType.PLAYER,
+                new HashMap<NpcEquipmentSlot, ItemStack>(),
+                false,
+                null,
+                new HashMap<ActionTrigger, List<NpcAction.NpcActionData>>(),
+                20.0f,
+                512.0f,
+                new HashMap<NpcAttribute, String>(),
+                true
             );
-            data.setSkin(new NpcData.NpcSkin(npc.getSkin(), false));
-            data.setShowInTab(false);
-            data.setTurnToPlayer(true);
-            data.setGlowing(false);
             Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().apply(data);
-            FancyNpcsPlugin.get().getNpcManager().addNpc(fancyNpc);
+            FancyNpcsPlugin.get().getNpcManager().registerNpc(fancyNpc);
             fancyNpc.spawnForAll();
             npcFancyIds.put(npc.getId(), fancyId);
             saveNPCId(npc.getId(), fancyId);
