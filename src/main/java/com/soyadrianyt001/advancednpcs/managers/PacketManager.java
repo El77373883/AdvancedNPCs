@@ -5,8 +5,6 @@ import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.ProtocolManager;
 import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.wrappers.*;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.Property;
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Location;
@@ -20,6 +18,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
@@ -100,6 +99,40 @@ public class PacketManager {
         }
     }
 
+    // ✅ CORREGIDO: agregar textura via reflexion para evitar NoSuchMethodError
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void addTextureToProfile(Object gameProfile, String skinUrl) {
+        try {
+            String base64 = Base64.getEncoder().encodeToString(
+                ("{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}").getBytes());
+
+            Method getProperties = gameProfile.getClass().getMethod("getProperties");
+            Object properties = getProperties.invoke(gameProfile);
+
+            // Crear Property via reflexion
+            Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
+            Object property;
+            try {
+                // authlib nuevo: Property(String name, String value)
+                property = propertyClass
+                    .getConstructor(String.class, String.class)
+                    .newInstance("textures", base64);
+            } catch (NoSuchMethodException e) {
+                // authlib viejo: Property(String name, String value, String signature)
+                property = propertyClass
+                    .getConstructor(String.class, String.class, String.class)
+                    .newInstance("textures", base64, "");
+            }
+
+            // put en el multimap/propertymap
+            Method put = properties.getClass().getMethod("put", Object.class, Object.class);
+            put.invoke(properties, "textures", property);
+
+        } catch (Exception e) {
+            plugin.getLogger().warning("Error textura reflexion: " + e.getMessage());
+        }
+    }
+
     private void spawnPlayerNPC(NPCEntity npc, Location loc) {
         plugin.getSkinManager().getSkinProfile(npc.getSkin(), profile -> {
             UUID uuid = UUID.randomUUID();
@@ -109,22 +142,20 @@ public class PacketManager {
             String displayName = npc.getNombre().length() > 16
                 ? npc.getNombre().substring(0, 16) : npc.getNombre();
 
-            GameProfile nmsProfile = new GameProfile(uuid, displayName);
+            WrappedGameProfile gameProfile = new WrappedGameProfile(uuid, displayName);
+
             if (profile != null) {
                 try {
                     org.bukkit.profile.PlayerTextures textures = profile.getTextures();
                     if (textures.getSkin() != null) {
                         String skinUrl = textures.getSkin().toString();
-                        String base64 = Base64.getEncoder().encodeToString(
-                            ("{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}").getBytes());
-                        nmsProfile.getProperties().put("textures",
-                            new Property("textures", base64, ""));
+                        // ✅ Usar reflexion en el handle NMS
+                        addTextureToProfile(gameProfile.getHandle(), skinUrl);
                     }
                 } catch (Exception e) {
                     plugin.getLogger().warning("Error aplicando textura: " + e.getMessage());
                 }
             }
-            WrappedGameProfile gameProfile = WrappedGameProfile.fromHandle(nmsProfile);
 
             for (org.bukkit.entity.Player player : loc.getWorld().getPlayers()) {
                 sendPlayerNPCPackets(npc, player, uuid, entityId, gameProfile, loc);
@@ -135,7 +166,6 @@ public class PacketManager {
         });
     }
 
-    // ✅ CORREGIDO: fix del ClassCastException ArrayList->EnumSet en ProtocolLib con 1.21.1
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void setPlayerInfoActions(PacketContainer packet, String... actionNames) {
         try {
@@ -174,10 +204,7 @@ public class PacketManager {
             // 1) Agregar al tab list
             PacketContainer addInfo = protocolManager.createPacket(
                 PacketType.Play.Server.PLAYER_INFO);
-
-            // ✅ CORREGIDO: usar NMS directo para evitar ClassCastException
             setPlayerInfoActions(addInfo, "ADD_PLAYER", "UPDATE_LISTED");
-
             PlayerInfoData infoData = new PlayerInfoData(
                 uuid, 0, false,
                 EnumWrappers.NativeGameMode.SURVIVAL,
@@ -208,7 +235,7 @@ public class PacketManager {
             rotHead.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
             protocolManager.sendServerPacket(player, rotHead);
 
-            // 4) Metadata para mostrar skin completa
+            // 4) Metadata skin completa
             List<WrappedDataValue> dataValues = new ArrayList<>();
             dataValues.add(new WrappedDataValue(
                 17,
@@ -457,8 +484,7 @@ public class PacketManager {
             if (uuid != null && entityId != null) {
                 String displayName = npc.getNombre().length() > 16
                     ? npc.getNombre().substring(0, 16) : npc.getNombre();
-                GameProfile nmsProfile = new GameProfile(uuid, displayName);
-                WrappedGameProfile gameProfile = WrappedGameProfile.fromHandle(nmsProfile);
+                WrappedGameProfile gameProfile = new WrappedGameProfile(uuid, displayName);
                 sendPlayerNPCPackets(npc, player, uuid, entityId, gameProfile, loc);
             } else {
                 spawnPlayerNPC(npc, loc);
