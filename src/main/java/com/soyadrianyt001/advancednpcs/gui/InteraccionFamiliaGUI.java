@@ -5,8 +5,11 @@ import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import java.util.Arrays;
@@ -25,46 +28,38 @@ public class InteraccionFamiliaGUI {
         Inventory inv = Bukkit.createInventory(null, 54,
             color("&8[&d&l✦ &7Interacciones Familiares &d&l✦&8]"));
         setBorder(inv);
-        inv.setItem(10, createToggle("ABRAZO", Material.PINK_WOOL,
+        inv.setItem(10, createToggle("abrazo", Material.PINK_WOOL,
             "&d&l✦ ABRAZO A LA ESPOSA &d&l✦",
             "&7El NPC abraza a su esposa",
-            "&7al estar cerca con particulas.",
-            isActive("abrazo")));
-        inv.setItem(11, createToggle("BESO", Material.ROSE_BUSH,
+            "&7al estar cerca con particulas."));
+        inv.setItem(11, createToggle("beso", Material.ROSE_BUSH,
             "&d&l✦ BESOS &d&l✦",
             "&7La pareja se da besos",
-            "&7con explosion de corazones.",
-            isActive("beso")));
-        inv.setItem(12, createToggle("JUGAR_HIJO", Material.SLIME_BALL,
+            "&7con explosion de corazones."));
+        inv.setItem(12, createToggle("jugar_hijo", Material.SLIME_BALL,
             "&e&l✦ JUGAR CON EL HIJO &e&l✦",
             "&7El padre juega con el hijo.",
-            "&7Corren juntos y se divierten.",
-            isActive("jugar_hijo")));
-        inv.setItem(13, createToggle("COMER_JUNTOS", Material.COOKED_BEEF,
+            "&7Corren juntos y se divierten."));
+        inv.setItem(13, createToggle("comer_juntos", Material.COOKED_BEEF,
             "&6&l✦ COMER JUNTOS &6&l✦",
             "&7La familia come junta",
-            "&7en una mesa a horas fijas.",
-            isActive("comer_juntos")));
-        inv.setItem(14, createToggle("ENSENAR", Material.BOOK,
+            "&7en una mesa a horas fijas."));
+        inv.setItem(14, createToggle("ensenar", Material.BOOK,
             "&a&l✦ ENSENAR A TRABAJAR &a&l✦",
             "&7El padre lleva al hijo",
-            "&7a su zona de trabajo.",
-            isActive("ensenar")));
-        inv.setItem(15, createToggle("HIJO_CORRE", Material.LEATHER_BOOTS,
+            "&7a su zona de trabajo."));
+        inv.setItem(15, createToggle("hijo_corre", Material.LEATHER_BOOTS,
             "&e&l✦ HIJO CORRE A LOS PADRES &e&l✦",
             "&7El hijo corre hacia",
-            "&7sus padres al verlos.",
-            isActive("hijo_corre")));
-        inv.setItem(16, createToggle("PASEO", Material.COMPASS,
+            "&7sus padres al verlos."));
+        inv.setItem(16, createToggle("paseo", Material.COMPASS,
             "&a&l✦ PASEO FAMILIAR &a&l✦",
             "&7La familia pasea junta",
-            "&7por su zona.",
-            isActive("paseo")));
-        inv.setItem(19, createToggle("PROTEGER_HIJO", Material.SHIELD,
+            "&7por su zona."));
+        inv.setItem(19, createToggle("proteger_hijo", Material.SHIELD,
             "&c&l✦ PROTEGER AL HIJO &c&l✦",
             "&7Padres entran en combate",
-            "&7si alguien ataca al hijo.",
-            isActive("proteger_hijo")));
+            "&7si alguien ataca al hijo."));
         if (npc.getFamiliaEsposaId() == -1) {
             inv.setItem(28, createSpawnEsposa());
         }
@@ -75,7 +70,8 @@ public class InteraccionFamiliaGUI {
         player.openInventory(inv);
     }
 
-    private ItemStack createToggle(String id, Material mat, String name, String desc1, String desc2, boolean activo) {
+    private ItemStack createToggle(String key, Material mat, String name, String desc1, String desc2) {
+        boolean activo = isActive(key);
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName(color(name + " &8| " + (activo ? "&a&lON" : "&c&lOFF")));
@@ -92,8 +88,11 @@ public class InteraccionFamiliaGUI {
             color("&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
         ));
         if (activo) {
-            meta.addEnchant(org.bukkit.enchantments.Enchantment.LUCK, 1, true);
-            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+            Enchantment ench = Enchantment.getByKey(NamespacedKey.minecraft("unbreaking"));
+            if (ench != null) {
+                meta.addEnchant(ench, 1, true);
+                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            }
         }
         item.setItemMeta(meta);
         return item;
