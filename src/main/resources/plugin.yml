@@ -6,6 +6,9 @@ author: soyadrianyt001
 description: AdvancedNPCS Premium - Creado por soyadrianyt001
 website: https://github.com/soyadrianyt001
 
+depend: [Vault, ProtocolLib]
+softdepend: [PlaceholderAPI]
+
 commands:
   anpc:
     description: Comando principal de AdvancedNPCS
