@@ -2,31 +2,25 @@ package com.soyadrianyt001.advancednpcs.managers;
 
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.Property;
-import net.minecraft.network.protocol.game.*;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.craftbukkit.v1_21_R1.CraftServer;
-import org.bukkit.craftbukkit.v1_21_R1.CraftWorld;
 import org.bukkit.entity.Player;
-import java.util.List;
-import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
 
 public class PacketManager {
 
     private final AdvancedNPCS plugin;
+    private final Map<Integer, Location> npcLocations;
 
     public PacketManager(AdvancedNPCS plugin) {
         this.plugin = plugin;
+        this.npcLocations = new HashMap<>();
     }
 
     public void spawnNPC(NPCEntity npc) {
         Location loc = npc.getLocation();
         if (loc == null || loc.getWorld() == null) return;
+        npcLocations.put(npc.getId(), loc);
         for (Player player : loc.getWorld().getPlayers()) {
             spawnNPCForPlayer(npc, player);
         }
@@ -35,28 +29,18 @@ public class PacketManager {
     public void spawnNPCForPlayer(NPCEntity npc, Player player) {
         try {
             Location loc = npc.getLocation();
-            if (loc == null) return;
-            UUID uuid = UUID.randomUUID();
-            GameProfile profile = new GameProfile(uuid, npc.getNombre().length() > 16
-                ? npc.getNombre().substring(0, 16) : npc.getNombre());
-            ServerLevel level = ((CraftWorld) loc.getWorld()).getHandle();
-            net.minecraft.server.MinecraftServer server =
-                ((CraftServer) Bukkit.getServer()).getServer();
-            ServerPlayer serverPlayer = new ServerPlayer(server, level, profile,
-                net.minecraft.world.entity.player.PlayerModelPart.values()[0]);
-            serverPlayer.setPos(loc.getX(), loc.getY(), loc.getZ());
-            ServerGamePacketListenerImpl conn =
-                ((org.bukkit.craftbukkit.v1_21_R1.entity.CraftPlayer) player).getHandle().connection;
-            conn.send(new ClientboundPlayerInfoUpdatePacket(
-                ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER,
-                serverPlayer));
-            conn.send(new ClientboundAddEntityPacket(serverPlayer));
-            conn.send(new ClientboundRotateHeadPacket(serverPlayer,
-                (byte) (loc.getYaw() * 256.0F / 360.0F)));
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                conn.send(new ClientboundPlayerInfoRemovePacket(
-                    List.of(serverPlayer.getUUID())));
-            }, 20L);
+            if (loc == null || loc.getWorld() == null) return;
+            if (!player.getWorld().equals(loc.getWorld())) return;
+            org.bukkit.entity.ArmorStand stand = loc.getWorld().spawn(loc, org.bukkit.entity.ArmorStand.class, entity -> {
+                entity.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                entity.setCustomNameVisible(true);
+                entity.setVisible(false);
+                entity.setGravity(false);
+                entity.setInvulnerable(true);
+                entity.setSmall(npc.getEscala() < 0.8);
+                entity.setPersistent(false);
+            });
+            npcLocations.put(npc.getId(), loc);
         } catch (Exception e) {
             plugin.getLogger().warning("Error spawneando NPC " + npc.getId() + ": " + e.getMessage());
         }
@@ -65,30 +49,52 @@ public class PacketManager {
     public void despawnNPC(NPCEntity npc) {
         Location loc = npc.getLocation();
         if (loc == null || loc.getWorld() == null) return;
-        for (Player player : loc.getWorld().getPlayers()) {
-            despawnNPCForPlayer(npc, player);
-        }
+        loc.getWorld().getEntities().stream()
+            .filter(e -> e instanceof org.bukkit.entity.ArmorStand)
+            .filter(e -> e.getCustomName() != null &&
+                e.getCustomName().contains(npc.getNombre()))
+            .forEach(org.bukkit.entity.Entity::remove);
+        npcLocations.remove(npc.getId());
     }
 
     public void despawnNPCForPlayer(NPCEntity npc, Player player) {
-        plugin.getLogger().info("Despawning NPC " + npc.getId() + " for " + player.getName());
+        despawnNPC(npc);
     }
 
     public void updateNameTag(NPCEntity npc) {
         Location loc = npc.getLocation();
         if (loc == null || loc.getWorld() == null) return;
-        for (Player player : loc.getWorld().getPlayers()) {
-            updateNameTagForPlayer(npc, player);
+        double vidaPorcentaje = (npc.getVidaActual() / npc.getVidaMaxima()) * 100;
+        String colorVida = vidaPorcentaje >= 75 ? "&a" : vidaPorcentaje >= 25 ? "&e" : "&c";
+        int barraLlena = (int)(vidaPorcentaje / 10);
+        StringBuilder barra = new StringBuilder("[");
+        for (int i = 0; i < 10; i++) {
+            barra.append(i < barraLlena ? colorVida + "■" : "&7■");
         }
+        barra.append("&7]");
+        String nameTag = plugin.getMessageManager().color(
+            "&b" + npc.getNombre() + "\n" +
+            "&c❤ &f" + (int)npc.getVidaActual() + "&8/&f" + (int)npc.getVidaMaxima() + "\n" +
+            barra + "\n" +
+            "&5✦ &7Creado por &bsoyadrianyt001");
+        loc.getWorld().getEntities().stream()
+            .filter(e -> e instanceof org.bukkit.entity.ArmorStand)
+            .filter(e -> e.getCustomName() != null &&
+                e.getCustomName().contains(npc.getNombre()))
+            .forEach(e -> e.setCustomName(nameTag));
     }
 
     public void updateNameTagForPlayer(NPCEntity npc, Player player) {
-        plugin.getLogger().info("Updating nametag for NPC " + npc.getId());
+        updateNameTag(npc);
     }
 
     public void moveNPC(NPCEntity npc, Location newLoc) {
-        npc.setLocation(newLoc);
         despawnNPC(npc);
+        npc.setLocation(newLoc);
         spawnNPC(npc);
+    }
+
+    public Location getNPCLocation(int id) {
+        return npcLocations.get(id);
     }
 }
