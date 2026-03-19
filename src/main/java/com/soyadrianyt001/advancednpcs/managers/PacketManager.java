@@ -83,17 +83,16 @@ public class PacketManager {
     private void spawnFancyNPC(NPCEntity npc, Location loc) {
         try {
             String fancyId = "advancednpc_" + npc.getId();
-            String displayName = plugin.getMessageManager().color(
-                "&b" + npc.getNombre());
             NpcData data = new NpcData(fancyId, UUID.randomUUID(), loc);
-            data.setDisplayName(displayName);
             data.setSkin(npc.getSkin());
+            data.setDisplayName(plugin.getMessageManager().color(
+                "&b" + npc.getNombre()));
             data.setShowInTab(false);
             data.setTurnToPlayer(true);
             data.setGlowing(false);
-            data.setEntityType(EntityType.PLAYER);
             Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().apply(data);
             FancyNpcsPlugin.get().getNpcManager().registerNpc(fancyNpc);
+            fancyNpc.create();
             fancyNpc.spawnForAll();
             npcFancyIds.put(npc.getId(), fancyId);
             saveNPCId(npc.getId(), fancyId);
