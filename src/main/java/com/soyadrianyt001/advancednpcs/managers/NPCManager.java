@@ -2,16 +2,12 @@ package com.soyadrianyt001.advancednpcs.managers;
 
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class NPCManager {
 
@@ -38,10 +34,12 @@ public class NPCManager {
             npcs.put(id, npc);
             if (id >= nextId) nextId = id + 1;
         }
-        for (NPCEntity npc : npcs.values()) {
-            npc.spawn();
-        }
-        plugin.getLogger().info("Cargados " + npcs.size() + " NPCs.");
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            for (NPCEntity npc : npcs.values()) {
+                spawnNPCEntity(npc);
+            }
+            plugin.getLogger().info("Cargados " + npcs.size() + " NPCs.");
+        }, 20L);
     }
 
     public NPCEntity createNPC(String nombre, Location location, Player creator) {
@@ -57,7 +55,6 @@ public class NPCManager {
         npc.setEstado("ACTIVO");
         npc.setEmocion("NEUTRAL");
         npc.setEscala(1.0);
-        npc.spawn();
         npc.saveToConfig();
         npcs.put(id, npc);
         updateRegistro(id, nombre);
@@ -65,10 +62,14 @@ public class NPCManager {
         return npc;
     }
 
+    public void spawnNPCEntity(NPCEntity npc) {
+        plugin.getPacketManager().spawnNPC(npc);
+    }
+
     public void deleteNPC(int id) {
         NPCEntity npc = npcs.get(id);
         if (npc == null) return;
-        npc.despawn();
+        plugin.getPacketManager().despawnNPC(npc);
         npcs.remove(id);
         plugin.getDataManager().deleteNPCConfig(id);
         removeRegistro(id);
@@ -124,7 +125,7 @@ public class NPCManager {
 
     public void reloadAll() {
         for (NPCEntity npc : npcs.values()) {
-            npc.despawn();
+            plugin.getPacketManager().despawnNPC(npc);
         }
         npcs.clear();
         nextId = 0;
