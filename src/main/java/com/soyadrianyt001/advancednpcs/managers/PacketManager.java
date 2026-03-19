@@ -4,9 +4,13 @@ import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.*;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.metadata.FixedMetadataValue;
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 
 public class PacketManager {
@@ -14,11 +18,89 @@ public class PacketManager {
     private final AdvancedNPCS plugin;
     private final Map<Integer, Entity> spawnedEntities;
     private final Map<Integer, ArmorStand> holoEntities;
+    private final File entityUUIDFile;
+    private FileConfiguration entityUUIDConfig;
 
     public PacketManager(AdvancedNPCS plugin) {
         this.plugin = plugin;
         this.spawnedEntities = new HashMap<>();
         this.holoEntities = new HashMap<>();
+        this.entityUUIDFile = new File(plugin.getDataFolder(), "entity_uuids.yml");
+        loadEntityUUIDs();
+        cleanupOldEntities();
+    }
+
+    private void loadEntityUUIDs() {
+        if (!entityUUIDFile.exists()) {
+            try {
+                entityUUIDFile.createNewFile();
+            } catch (IOException e) {
+                plugin.getLogger().warning("Error creando entity_uuids.yml");
+            }
+        }
+        entityUUIDConfig = YamlConfiguration.loadConfiguration(entityUUIDFile);
+    }
+
+    private void saveEntityUUID(int npcId, UUID entityUUID, UUID holoUUID) {
+        if (entityUUID != null)
+            entityUUIDConfig.set("entities." + npcId + ".entity", entityUUID.toString());
+        if (holoUUID != null)
+            entityUUIDConfig.set("entities." + npcId + ".holo", holoUUID.toString());
+        try {
+            entityUUIDConfig.save(entityUUIDFile);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Error guardando UUIDs de entidades.");
+        }
+    }
+
+    private void removeEntityUUID(int npcId) {
+        entityUUIDConfig.set("entities." + npcId, null);
+        try {
+            entityUUIDConfig.save(entityUUIDFile);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Error removiendo UUID de entidad.");
+        }
+    }
+
+    public void cleanupOldEntities() {
+        plugin.getLogger().info("Limpiando entidades antiguas de AdvancedNPCS...");
+        int count = 0;
+        for (org.bukkit.World world : plugin.getServer().getWorlds()) {
+            for (Entity entity : new ArrayList<>(world.getEntities())) {
+                if (entity.hasMetadata("advancednpc") ||
+                    entity.hasMetadata("advancednpc_holo")) {
+                    entity.remove();
+                    count++;
+                }
+            }
+        }
+        if (entityUUIDConfig.contains("entities")) {
+            for (String key : entityUUIDConfig.getConfigurationSection("entities").getKeys(false)) {
+                String entityUUIDStr = entityUUIDConfig.getString("entities." + key + ".entity");
+                String holoUUIDStr = entityUUIDConfig.getString("entities." + key + ".holo");
+                for (org.bukkit.World world : plugin.getServer().getWorlds()) {
+                    if (entityUUIDStr != null) {
+                        try {
+                            UUID uuid = UUID.fromString(entityUUIDStr);
+                            Entity e = world.getEntity(uuid);
+                            if (e != null) { e.remove(); count++; }
+                        } catch (Exception ignored) {}
+                    }
+                    if (holoUUIDStr != null) {
+                        try {
+                            UUID uuid = UUID.fromString(holoUUIDStr);
+                            Entity e = world.getEntity(uuid);
+                            if (e != null) { e.remove(); count++; }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+        }
+        entityUUIDConfig.set("entities", null);
+        try {
+            entityUUIDConfig.save(entityUUIDFile);
+        } catch (IOException ignored) {}
+        plugin.getLogger().info("Eliminadas " + count + " entidades antiguas de AdvancedNPCS.");
     }
 
     public void spawnNPC(NPCEntity npc) {
@@ -36,7 +118,9 @@ public class PacketManager {
             living.setInvulnerable(true);
         }
         spawnedEntities.put(npc.getId(), entity);
-        spawnHologram(npc, loc);
+        ArmorStand holo = spawnHologram(npc, loc);
+        saveEntityUUID(npc.getId(), entity.getUniqueId(),
+            holo != null ? holo.getUniqueId() : null);
     }
 
     private Entity spawnEntityByType(NPCEntity npc, Location loc) {
@@ -108,7 +192,7 @@ public class PacketManager {
         }
     }
 
-    private void spawnHologram(NPCEntity npc, Location loc) {
+    private ArmorStand spawnHologram(NPCEntity npc, Location loc) {
         if (holoEntities.containsKey(npc.getId())) {
             ArmorStand old = holoEntities.get(npc.getId());
             if (old != null && !old.isDead()) old.remove();
@@ -116,15 +200,14 @@ public class PacketManager {
         double vidaPorcentaje = (npc.getVidaActual() / npc.getVidaMaxima()) * 100;
         String colorVida = vidaPorcentaje >= 75 ? "&a" : vidaPorcentaje >= 25 ? "&e" : "&c";
         int barraLlena = (int)(vidaPorcentaje / 10);
-        StringBuilder barra = new StringBuilder(colorVida + "[");
+        StringBuilder barra = new StringBuilder("[");
         for (int i = 0; i < 10; i++) {
-            barra.append(i < barraLlena ? "■" : "&7■");
+            barra.append(i < barraLlena ? colorVida + "■" : "&7■");
         }
-        barra.append(colorVida + "]");
+        barra.append("&7]");
         String holoText = plugin.getMessageManager().color(
             colorVida + "❤ " + (int)npc.getVidaActual() + "/" + (int)npc.getVidaMaxima() +
-            " " + barra +
-            " &8| &5✦ &7by &bsoyadrianyt001");
+            " " + barra);
         Location holoLoc = loc.clone().add(0, 2.3, 0);
         ArmorStand holo = holoLoc.getWorld().spawn(holoLoc, ArmorStand.class, e -> {
             e.setCustomName(holoText);
@@ -138,6 +221,7 @@ public class PacketManager {
         holo.setMetadata("advancednpc_holo",
             new FixedMetadataValue(plugin, npc.getId()));
         holoEntities.put(npc.getId(), holo);
+        return holo;
     }
 
     public void despawnNPC(NPCEntity npc) {
@@ -145,10 +229,36 @@ public class PacketManager {
         if (entity != null && !entity.isDead()) entity.remove();
         ArmorStand holo = holoEntities.remove(npc.getId());
         if (holo != null && !holo.isDead()) holo.remove();
+        removeEntityUUID(npc.getId());
     }
 
     public void despawnNPCForPlayer(NPCEntity npc, Player player) {
         despawnNPC(npc);
+    }
+
+    public void despawnAll() {
+        plugin.getLogger().info("Eliminando todas las entidades de AdvancedNPCS...");
+        for (Entity entity : new ArrayList<>(spawnedEntities.values())) {
+            if (entity != null && !entity.isDead()) entity.remove();
+        }
+        spawnedEntities.clear();
+        for (ArmorStand holo : new ArrayList<>(holoEntities.values())) {
+            if (holo != null && !holo.isDead()) holo.remove();
+        }
+        holoEntities.clear();
+        for (org.bukkit.World world : plugin.getServer().getWorlds()) {
+            for (Entity entity : new ArrayList<>(world.getEntities())) {
+                if (entity.hasMetadata("advancednpc") ||
+                    entity.hasMetadata("advancednpc_holo")) {
+                    entity.remove();
+                }
+            }
+        }
+        entityUUIDConfig.set("entities", null);
+        try {
+            entityUUIDConfig.save(entityUUIDFile);
+        } catch (IOException ignored) {}
+        plugin.getLogger().info("Todas las entidades eliminadas correctamente.");
     }
 
     public void updateNameTag(NPCEntity npc) {
@@ -156,7 +266,8 @@ public class PacketManager {
         if (entity != null) {
             entity.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
         }
-        spawnHologram(npc, npc.getLocation());
+        Location loc = npc.getLocation();
+        if (loc != null) spawnHologram(npc, loc);
     }
 
     public void updateNameTagForPlayer(NPCEntity npc, Player player) {
@@ -185,4 +296,3 @@ public class PacketManager {
         return spawnedEntities.get(npcId);
     }
 }
-
