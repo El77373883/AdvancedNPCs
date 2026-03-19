@@ -2,6 +2,7 @@ package com.soyadrianyt001.advancednpcs.managers;
 
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.scheduler.BukkitTask;
@@ -49,9 +50,27 @@ public class PartikulasManager {
         if (task != null) task.cancel();
     }
 
+    // ✅ CORREGIDO: verifica si la particula necesita DustOptions
+    private boolean needsDust(Particle particle) {
+        try {
+            return particle.getDataType() == Particle.DustOptions.class;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private Particle.DustOptions getDefaultDust() {
+        return new Particle.DustOptions(Color.RED, 1.0f);
+    }
+
     private void spawnNormal(Location loc, Particle particle) {
-        loc.getWorld().spawnParticle(particle,
-            loc.clone().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.05);
+        if (needsDust(particle)) {
+            loc.getWorld().spawnParticle(particle,
+                loc.clone().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.05, getDefaultDust());
+        } else {
+            loc.getWorld().spawnParticle(particle,
+                loc.clone().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.05);
+        }
     }
 
     private void spawnAura(Location loc, Particle particle) {
@@ -62,7 +81,11 @@ public class PartikulasManager {
             double px = loc.getX() + radius * Math.cos(angle);
             double pz = loc.getZ() + radius * Math.sin(angle);
             Location pLoc = new Location(loc.getWorld(), px, loc.getY() + 1, pz);
-            loc.getWorld().spawnParticle(particle, pLoc, 1, 0, 0, 0, 0);
+            if (needsDust(particle)) {
+                loc.getWorld().spawnParticle(particle, pLoc, 1, 0, 0, 0, 0, getDefaultDust());
+            } else {
+                loc.getWorld().spawnParticle(particle, pLoc, 1, 0, 0, 0, 0);
+            }
         }
     }
 
@@ -74,19 +97,33 @@ public class PartikulasManager {
             double px = loc.getX() + radius * Math.cos(angle);
             double pz = loc.getZ() + radius * Math.sin(angle);
             Location pLoc = new Location(loc.getWorld(), px, loc.getY() + 2.2, pz);
-            loc.getWorld().spawnParticle(particle, pLoc, 1, 0, 0, 0, 0);
+            if (needsDust(particle)) {
+                loc.getWorld().spawnParticle(particle, pLoc, 1, 0, 0, 0, 0, getDefaultDust());
+            } else {
+                loc.getWorld().spawnParticle(particle, pLoc, 1, 0, 0, 0, 0);
+            }
         }
     }
 
     private void spawnRastro(Location loc, Particle particle) {
-        loc.getWorld().spawnParticle(particle,
-            loc.clone().add(0, 0.1, 0), 3, 0.2, 0, 0.2, 0);
+        if (needsDust(particle)) {
+            loc.getWorld().spawnParticle(particle,
+                loc.clone().add(0, 0.1, 0), 3, 0.2, 0, 0.2, 0, getDefaultDust());
+        } else {
+            loc.getWorld().spawnParticle(particle,
+                loc.clone().add(0, 0.1, 0), 3, 0.2, 0, 0.2, 0);
+        }
     }
 
     public void spawnBurstEffect(Location loc, Particle particle, int count) {
         if (loc == null || loc.getWorld() == null) return;
-        loc.getWorld().spawnParticle(particle, loc.clone().add(0, 1, 0),
-            count, 0.5, 0.5, 0.5, 0.1);
+        if (needsDust(particle)) {
+            loc.getWorld().spawnParticle(particle, loc.clone().add(0, 1, 0),
+                count, 0.5, 0.5, 0.5, 0.1, getDefaultDust());
+        } else {
+            loc.getWorld().spawnParticle(particle, loc.clone().add(0, 1, 0),
+                count, 0.5, 0.5, 0.5, 0.1);
+        }
     }
 
     public void spawnHearts(Location loc) {
