@@ -2,6 +2,7 @@ package com.soyadrianyt001.advancednpcs.managers;
 
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
+import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -64,8 +65,10 @@ public class ClimatiManager {
             case "TORMENTA" -> {
                 List<String> frases = config.getStringList("reaccion_clima.tormenta.frases");
                 if (!frases.isEmpty()) sendFrase(npc, frases.get(random.nextInt(frases.size())));
-                plugin.getParticulasManager().spawnBurstEffect(
-                    npc.getLocation(), Particle.FLASH, 3);
+                Location loc = npc.getLocation();
+                if (loc != null) {
+                    loc.getWorld().strikeLightningEffect(loc);
+                }
             }
             case "SOLEADO" -> {
                 if (npc.getProfesion() != null && !npc.getProfesion().equals("NINGUNA")) {
@@ -77,8 +80,13 @@ public class ClimatiManager {
 
     private void handleClimaActivo(NPCEntity npc, String clima) {
         if (clima.equals("LLUVIA")) {
-            plugin.getParticulasManager().spawnBurstEffect(
-                npc.getLocation(), Particle.DRIPPING_WATER, 2);
+            Location loc = npc.getLocation();
+            if (loc != null && loc.getWorld() != null) {
+                loc.getWorld().spawnParticle(
+                    Particle.DRIPPING_WATER,
+                    loc.clone().add(0, 1, 0),
+                    2, 0.3, 0.3, 0.3, 0);
+            }
         }
     }
 
@@ -87,14 +95,15 @@ public class ClimatiManager {
         double ry = config.getDouble("reaccion_clima.lluvia.refugio.y", npc.getLocation().getY());
         double rz = config.getDouble("reaccion_clima.lluvia.refugio.z", npc.getLocation().getZ());
         String mundo = npc.getMundo();
-        org.bukkit.World w = plugin.getServer().getWorld(mundo);
+        World w = plugin.getServer().getWorld(mundo);
         if (w != null) {
-            plugin.getPacketManager().moveNPC(npc, new org.bukkit.Location(w, rx, ry, rz));
+            plugin.getPacketManager().moveNPC(npc,
+                new Location(w, rx, ry, rz));
         }
     }
 
     private void sendFrase(NPCEntity npc, String frase) {
-        org.bukkit.Location loc = npc.getLocation();
+        Location loc = npc.getLocation();
         if (loc == null || loc.getWorld() == null) return;
         for (org.bukkit.entity.Player player : loc.getWorld().getPlayers()) {
             if (npc.isNearby(player, 20)) {
