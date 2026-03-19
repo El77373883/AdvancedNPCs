@@ -41,14 +41,37 @@ public class NPCManager {
                 World world = plugin.getServer().getWorld(npc.getMundo());
                 if (world == null) {
                     plugin.getLogger().warning("Mundo '" + npc.getMundo() +
-                        "' del NPC #" + npc.getId() +
-                        " no encontrado. Asegurate de que Multiverse lo tenga cargado.");
+                        "' del NPC #" + npc.getId() + " no encontrado.");
                     continue;
                 }
                 spawnNPCEntity(npc);
+                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                    activarComportamiento(npc);
+                }, 20L);
             }
             plugin.getLogger().info("Cargados " + npcs.size() + " NPCs.");
         }, 40L);
+    }
+
+    private void activarComportamiento(NPCEntity npc) {
+        plugin.getTrabajoManager().stopTrabajo(npc);
+        switch (npc.getModo()) {
+            case "VIDA_PROPIA" ->
+                plugin.getTrabajoManager().startCaminarNatural(npc);
+            case "GUARDAESPALDAS", "COMBATE" ->
+                plugin.getTrabajoManager().startTrabajo(npc);
+            case "POLICIA", "GUARDIA" ->
+                plugin.getTrabajoManager().startTrabajo(npc);
+        }
+        if (!npc.getProfesion().equals("NINGUNA") &&
+            !npc.getModo().equals("VIDA_PROPIA") &&
+            !npc.getModo().equals("ESTATICO") &&
+            !npc.getModo().equals("DECORATIVO")) {
+            plugin.getTrabajoManager().startTrabajo(npc);
+        }
+        if (npc.isCaminarActivo() && !npc.getModo().equals("VIDA_PROPIA")) {
+            plugin.getTrabajoManager().startCaminarNatural(npc);
+        }
     }
 
     public NPCEntity createNPC(String nombre, Location location, Player creator) {
@@ -80,6 +103,7 @@ public class NPCManager {
     public void deleteNPC(int id) {
         NPCEntity npc = npcs.get(id);
         if (npc == null) return;
+        plugin.getTrabajoManager().stopTrabajo(npc);
         plugin.getPacketManager().despawnNPC(npc);
         npcs.remove(id);
         plugin.getDataManager().deleteNPCConfig(id);
@@ -110,17 +134,13 @@ public class NPCManager {
         return result;
     }
 
-    public int getTotalNPCs() {
-        return npcs.size();
-    }
+    public int getTotalNPCs() { return npcs.size(); }
 
     public int getTotalNPCsByWorld(String worldName) {
         return getNPCsByWorld(worldName).size();
     }
 
-    public boolean exists(int id) {
-        return npcs.containsKey(id);
-    }
+    public boolean exists(int id) { return npcs.containsKey(id); }
 
     private void updateRegistro(int id, String nombre) {
         List<Map<?, ?>> lista = plugin.getConfig().getMapList("npcs_registrados");
@@ -141,13 +161,12 @@ public class NPCManager {
     }
 
     public void saveAll() {
-        for (NPCEntity npc : npcs.values()) {
-            npc.saveToConfig();
-        }
+        for (NPCEntity npc : npcs.values()) npc.saveToConfig();
     }
 
     public void reloadAll() {
         for (NPCEntity npc : npcs.values()) {
+            plugin.getTrabajoManager().stopTrabajo(npc);
             plugin.getPacketManager().despawnNPC(npc);
         }
         npcs.clear();
