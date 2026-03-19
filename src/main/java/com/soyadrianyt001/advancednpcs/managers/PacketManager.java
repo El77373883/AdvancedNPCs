@@ -4,11 +4,13 @@ import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.*;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.metadata.FixedMetadataValue;
+import org.bukkit.profile.PlayerProfile;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -32,11 +34,8 @@ public class PacketManager {
 
     private void loadEntityUUIDs() {
         if (!entityUUIDFile.exists()) {
-            try {
-                entityUUIDFile.createNewFile();
-            } catch (IOException e) {
-                plugin.getLogger().warning("Error creando entity_uuids.yml");
-            }
+            try { entityUUIDFile.createNewFile(); }
+            catch (IOException e) { plugin.getLogger().warning("Error creando entity_uuids.yml"); }
         }
         entityUUIDConfig = YamlConfiguration.loadConfiguration(entityUUIDFile);
     }
@@ -46,20 +45,14 @@ public class PacketManager {
             entityUUIDConfig.set("entities." + npcId + ".entity", entityUUID.toString());
         if (holoUUID != null)
             entityUUIDConfig.set("entities." + npcId + ".holo", holoUUID.toString());
-        try {
-            entityUUIDConfig.save(entityUUIDFile);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Error guardando UUIDs de entidades.");
-        }
+        try { entityUUIDConfig.save(entityUUIDFile); }
+        catch (IOException e) { plugin.getLogger().warning("Error guardando UUIDs."); }
     }
 
     private void removeEntityUUID(int npcId) {
         entityUUIDConfig.set("entities." + npcId, null);
-        try {
-            entityUUIDConfig.save(entityUUIDFile);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Error removiendo UUID de entidad.");
-        }
+        try { entityUUIDConfig.save(entityUUIDFile); }
+        catch (IOException e) { plugin.getLogger().warning("Error removiendo UUID."); }
     }
 
     public void cleanupOldEntities() {
@@ -97,30 +90,66 @@ public class PacketManager {
             }
         }
         entityUUIDConfig.set("entities", null);
-        try {
-            entityUUIDConfig.save(entityUUIDFile);
-        } catch (IOException ignored) {}
-        plugin.getLogger().info("Eliminadas " + count + " entidades antiguas de AdvancedNPCS.");
+        try { entityUUIDConfig.save(entityUUIDFile); }
+        catch (IOException ignored) {}
+        plugin.getLogger().info("Eliminadas " + count + " entidades antiguas.");
     }
 
     public void spawnNPC(NPCEntity npc) {
         Location loc = npc.getLocation();
         if (loc == null || loc.getWorld() == null) return;
         despawnNPC(npc);
-        Entity entity = spawnEntityByType(npc, loc);
-        if (entity == null) return;
-        entity.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
-        entity.setCustomNameVisible(true);
-        entity.setMetadata("advancednpc", new FixedMetadataValue(plugin, npc.getId()));
-        if (entity instanceof LivingEntity living) {
-            living.setRemoveWhenFarAway(false);
-            living.setAI(false);
-            living.setInvulnerable(true);
+        String tipo = npc.getTipo().toUpperCase();
+        if (tipo.equals("PLAYER")) {
+            spawnPlayerNPC(npc, loc);
+        } else {
+            Entity entity = spawnEntityByType(npc, loc);
+            if (entity == null) return;
+            entity.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+            entity.setCustomNameVisible(true);
+            entity.setMetadata("advancednpc", new FixedMetadataValue(plugin, npc.getId()));
+            if (entity instanceof LivingEntity living) {
+                living.setRemoveWhenFarAway(false);
+                living.setAI(false);
+                living.setInvulnerable(true);
+            }
+            spawnedEntities.put(npc.getId(), entity);
+            ArmorStand holo = spawnHologram(npc, loc);
+            saveEntityUUID(npc.getId(), entity.getUniqueId(),
+                holo != null ? holo.getUniqueId() : null);
         }
-        spawnedEntities.put(npc.getId(), entity);
-        ArmorStand holo = spawnHologram(npc, loc);
-        saveEntityUUID(npc.getId(), entity.getUniqueId(),
-            holo != null ? holo.getUniqueId() : null);
+    }
+
+    private void spawnPlayerNPC(NPCEntity npc, Location loc) {
+        plugin.getSkinManager().getSkinProfile(npc.getSkin(), profile -> {
+            ArmorStand stand = loc.getWorld().spawn(loc, ArmorStand.class, e -> {
+                e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                e.setCustomNameVisible(true);
+                e.setVisible(true);
+                e.setGravity(false);
+                e.setInvulnerable(true);
+                e.setArms(true);
+                e.setBasePlate(false);
+                e.setMetadata("advancednpc", new FixedMetadataValue(plugin, npc.getId()));
+                e.setRemoveWhenFarAway(false);
+                ItemStack helmet = new ItemStack(Material.PLAYER_HEAD);
+                SkullMeta meta = (SkullMeta) helmet.getItemMeta();
+                if (profile != null) {
+                    meta.setOwnerProfile(profile);
+                } else {
+                    meta.setOwner(npc.getSkin());
+                }
+                helmet.setItemMeta(meta);
+                e.setHelmet(helmet);
+                e.setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
+                e.setLeggings(new ItemStack(Material.LEATHER_LEGGINGS));
+                e.setBoots(new ItemStack(Material.LEATHER_BOOTS));
+            });
+            spawnedEntities.put(npc.getId(), stand);
+            ArmorStand holo = spawnHologram(npc, loc);
+            saveEntityUUID(npc.getId(), stand.getUniqueId(),
+                holo != null ? holo.getUniqueId() : null);
+        });
     }
 
     private Entity spawnEntityByType(NPCEntity npc, Location loc) {
@@ -169,6 +198,34 @@ public class PacketManager {
                     e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
                     e.setCustomNameVisible(true);
                 });
+                case "PHANTOM" -> loc.getWorld().spawn(loc, Phantom.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "SPIDER" -> loc.getWorld().spawn(loc, Spider.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "DROWNED" -> loc.getWorld().spawn(loc, Drowned.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "HUSK" -> loc.getWorld().spawn(loc, Husk.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "PILLAGER" -> loc.getWorld().spawn(loc, Pillager.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "VINDICATOR" -> loc.getWorld().spawn(loc, Vindicator.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
+                case "SNOW_GOLEM" -> loc.getWorld().spawn(loc, Snowman.class, e -> {
+                    e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
+                    e.setCustomNameVisible(true);
+                });
                 default -> loc.getWorld().spawn(loc, ArmorStand.class, e -> {
                     e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
                     e.setCustomNameVisible(true);
@@ -180,7 +237,7 @@ public class PacketManager {
                 });
             };
         } catch (Exception e) {
-            plugin.getLogger().warning("Error spawneando entidad tipo " + tipo + ": " + e.getMessage());
+            plugin.getLogger().warning("Error spawneando tipo " + tipo + ": " + e.getMessage());
             return loc.getWorld().spawn(loc, ArmorStand.class, stand -> {
                 stand.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
                 stand.setCustomNameVisible(true);
@@ -208,7 +265,8 @@ public class PacketManager {
         String holoText = plugin.getMessageManager().color(
             colorVida + "❤ " + (int)npc.getVidaActual() + "/" + (int)npc.getVidaMaxima() +
             " " + barra);
-        Location holoLoc = loc.clone().add(0, 2.3, 0);
+        double holoHeight = npc.getTipo().equalsIgnoreCase("PLAYER") ? 2.8 : 2.3;
+        Location holoLoc = loc.clone().add(0, holoHeight, 0);
         ArmorStand holo = holoLoc.getWorld().spawn(holoLoc, ArmorStand.class, e -> {
             e.setCustomName(holoText);
             e.setCustomNameVisible(true);
@@ -217,9 +275,8 @@ public class PacketManager {
             e.setInvulnerable(true);
             e.setSmall(true);
             e.setMarker(true);
+            e.setMetadata("advancednpc_holo", new FixedMetadataValue(plugin, npc.getId()));
         });
-        holo.setMetadata("advancednpc_holo",
-            new FixedMetadataValue(plugin, npc.getId()));
         holoEntities.put(npc.getId(), holo);
         return holo;
     }
@@ -255,9 +312,8 @@ public class PacketManager {
             }
         }
         entityUUIDConfig.set("entities", null);
-        try {
-            entityUUIDConfig.save(entityUUIDFile);
-        } catch (IOException ignored) {}
+        try { entityUUIDConfig.save(entityUUIDFile); }
+        catch (IOException ignored) {}
         plugin.getLogger().info("Todas las entidades eliminadas correctamente.");
     }
 
@@ -286,7 +342,8 @@ public class PacketManager {
             entity.teleport(newLoc);
             ArmorStand holo = holoEntities.get(npc.getId());
             if (holo != null && !holo.isDead()) {
-                holo.teleport(newLoc.clone().add(0, 2.3, 0));
+                double holoHeight = npc.getTipo().equalsIgnoreCase("PLAYER") ? 2.8 : 2.3;
+                holo.teleport(newLoc.clone().add(0, holoHeight, 0));
             }
         }
         npc.setLocation(newLoc);
