@@ -144,7 +144,6 @@ public class PacketManager {
                 gameProfile,
                 WrappedChatComponent.fromText(npc.getNombre()),
                 (WrappedRemoteChatSessionData) null);
-            // ✅ CORREGIDO: write(0) en lugar de write(1)
             addInfo.getPlayerInfoDataLists().write(0,
                 Collections.singletonList(infoData));
             protocolManager.sendServerPacket(player, addInfo);
@@ -154,7 +153,6 @@ public class PacketManager {
                 PacketType.Play.Server.SPAWN_ENTITY);
             spawnPacket.getIntegers().write(0, entityId);
             spawnPacket.getUUIDs().write(0, uuid);
-            // ✅ CORREGIDO: EntityType en lugar de integer 128
             spawnPacket.getEntityTypeModifier().write(0, org.bukkit.entity.EntityType.PLAYER);
             spawnPacket.getDoubles().write(0, loc.getX());
             spawnPacket.getDoubles().write(1, loc.getY());
@@ -170,18 +168,17 @@ public class PacketManager {
             rotHead.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
             protocolManager.sendServerPacket(player, rotHead);
 
-            // 4) Metadata - mostrar skin completa
-            WrappedDataWatcher watcher = new WrappedDataWatcher();
-            WrappedDataWatcher.WrappedDataWatcherObject skinLayersObj =
-                new WrappedDataWatcher.WrappedDataWatcherObject(
-                    17, WrappedDataWatcher.Registry.get(Byte.class));
-            watcher.setObject(skinLayersObj, (byte) 127);
+            // 4) Metadata con WrappedDataValue para 1.21
+            List<WrappedDataValue> dataValues = new ArrayList<>();
+            dataValues.add(new WrappedDataValue(
+                17,
+                WrappedRegistry.get(WrappedDataValue.getSerializer(Byte.class)),
+                (byte) 127
+            ));
             PacketContainer metadata = protocolManager.createPacket(
                 PacketType.Play.Server.ENTITY_METADATA);
             metadata.getIntegers().write(0, entityId);
-            // ✅ CORREGIDO: getDataValueCollectionModifier para 1.21
-            metadata.getDataValueCollectionModifier().write(0,
-                watcher.getWatchableObjects());
+            metadata.getDataValueCollectionModifier().write(0, dataValues);
             protocolManager.sendServerPacket(player, metadata);
 
             // 5) Remover del tab list despues de 3 segundos
