@@ -116,14 +116,15 @@ public class PacketManager {
         double vidaPorcentaje = (npc.getVidaActual() / npc.getVidaMaxima()) * 100;
         String colorVida = vidaPorcentaje >= 75 ? "&a" : vidaPorcentaje >= 25 ? "&e" : "&c";
         int barraLlena = (int)(vidaPorcentaje / 10);
-        StringBuilder barra = new StringBuilder("[");
+        StringBuilder barra = new StringBuilder(colorVida + "[");
         for (int i = 0; i < 10; i++) {
-            barra.append(i < barraLlena ? colorVida + "■" : "&7■");
+            barra.append(i < barraLlena ? "■" : "&7■");
         }
-        barra.append("&7]");
+        barra.append(colorVida + "]");
         String holoText = plugin.getMessageManager().color(
             colorVida + "❤ " + (int)npc.getVidaActual() + "/" + (int)npc.getVidaMaxima() +
-            " " + barra);
+            " " + barra +
+            " &8| &5✦ &7by &bsoyadrianyt001");
         Location holoLoc = loc.clone().add(0, 2.3, 0);
         ArmorStand holo = holoLoc.getWorld().spawn(holoLoc, ArmorStand.class, e -> {
             e.setCustomName(holoText);
@@ -155,8 +156,7 @@ public class PacketManager {
         if (entity != null) {
             entity.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
         }
-        Location loc = npc.getLocation();
-        if (loc != null) spawnHologram(npc, loc);
+        spawnHologram(npc, npc.getLocation());
     }
 
     public void updateNameTagForPlayer(NPCEntity npc, Player player) {
@@ -185,3 +185,4 @@ public class PacketManager {
         return spawnedEntities.get(npcId);
     }
 }
+
