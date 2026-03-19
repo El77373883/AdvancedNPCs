@@ -4,8 +4,6 @@ import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -26,14 +24,15 @@ public class GUIListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (event.getCurrentItem() == null) return;
         if (event.getCurrentItem().getType() == Material.AIR) return;
+
         String title = ChatColor.stripColor(event.getView().getTitle());
 
-        if (title.contains("AdvancedNPCS") && title.contains("Premium") && title.contains("⚡")) {
+        if (title.contains("AdvancedNPCS") && title.contains("Premium")) {
             event.setCancelled(true);
-            handlePanelClick(player, event.getSlot(), event.getCurrentItem());
+            handlePanelClick(player, event.getSlot(), event.getCurrentItem(), title);
             return;
         }
-        if (title.contains("Config") && title.contains("NPC #")) {
+        if (title.contains("NPC #") && title.contains("Config")) {
             event.setCancelled(true);
             handleConfigClick(player, event.getSlot(), event.getCurrentItem(), title);
             return;
@@ -48,7 +47,7 @@ public class GUIListener implements Listener {
             handleModoClick(player, event.getSlot(), event.getCurrentItem());
             return;
         }
-        if (title.contains("⚠") && title.contains("seguro")) {
+        if (title.contains("Confirmar") || title.contains("seguro")) {
             event.setCancelled(true);
             handleConfirmClick(player, event.getSlot(), event.getCurrentItem());
             return;
@@ -84,37 +83,45 @@ public class GUIListener implements Listener {
         }
     }
 
-    private void handlePanelClick(Player player, int slot, ItemStack item) {
+    private void handlePanelClick(Player player, int slot, ItemStack item, String title) {
         if (slot == 10 && item.getType() == Material.EMERALD) {
             player.closeInventory();
             plugin.getListeners().getChatListener().awaitInput(player,
-                "¿Como quieres llamar a tu NPC?", nombre -> {
+                "&7Como quieres llamar a tu NPC&8:", nombre -> {
                     NPCEntity npc = plugin.getNPCManager().createNPC(
                         nombre, player.getLocation(), player);
+                    plugin.getNPCManager().spawnNPCEntity(npc);
                     plugin.getMessageManager().send(player, "npc_creado",
                         "%npc_id%", String.valueOf(npc.getId()));
                     player.playSound(player.getLocation(),
                         org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
-                    plugin.getParticulasManager().spawnHearts(player.getLocation());
-                    new ModoGUI(plugin, npc).open(player);
+                    new ConfigGUI(plugin, npc).open(player);
                 });
             return;
         }
         if (slot == 45 && item.getType() == Material.ARROW) {
-            int page = getCurrentPage(player);
+            int page = extractPage(title);
             if (page > 0) new PanelGUI(plugin, page - 1).open(player);
             return;
         }
         if (slot == 53 && item.getType() == Material.ARROW) {
-            int page = getCurrentPage(player);
+            int page = extractPage(title);
             int total = plugin.getNPCManager().getTotalNPCs();
-            int totalPages = (int) Math.ceil(total / 28.0);
+            int totalPages = Math.max(1, (int) Math.ceil(total / 28.0));
             if (page < totalPages - 1) new PanelGUI(plugin, page + 1).open(player);
             return;
         }
         if (item.getType() == Material.PLAYER_HEAD && item.getItemMeta() != null) {
             String displayName = ChatColor.stripColor(item.getItemMeta().getDisplayName());
             NPCEntity npc = plugin.getNPCManager().getNPCByName(displayName);
+            if (npc == null) {
+                for (NPCEntity n : plugin.getNPCManager().getAllNPCs()) {
+                    if (n.getNombre().equalsIgnoreCase(displayName.trim())) {
+                        npc = n;
+                        break;
+                    }
+                }
+            }
             if (npc != null) new ConfigGUI(plugin, npc).open(player);
         }
     }
@@ -124,37 +131,61 @@ public class GUIListener implements Listener {
         if (npcId == -1) return;
         NPCEntity npc = plugin.getNPCManager().getNPC(npcId);
         if (npc == null) return;
+
         switch (slot) {
             case 11 -> {
                 player.closeInventory();
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&7Escribe el nuevo &enombre &7del NPC en el chat&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "Escribe el nuevo nombre del NPC:", nombre -> {
+                    "&7Escribe el nuevo nombre del NPC:", nombre -> {
                         npc.setNombre(nombre);
                         npc.saveToConfig();
-                        npc.respawn();
-                        plugin.getMessageManager().send(player, "npc_editado",
-                            "%npc_id%", String.valueOf(npcId));
+                        plugin.getPacketManager().updateNameTag(npc);
+                        plugin.getMessageManager().sendWithPrefix(player,
+                            "&a✔ &7Nombre cambiado a &e" + nombre);
+                        player.playSound(player.getLocation(),
+                            org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
                         new ConfigGUI(plugin, npc).open(player);
                     });
             }
             case 12 -> {
                 player.closeInventory();
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&7Escribe el nombre del jugador para la &dskin &7en el chat&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "Escribe el nombre del jugador para la skin:", skinName -> {
+                    "&7Escribe el nombre del jugador para la skin:", skinName -> {
                         npc.setSkin(skinName);
                         npc.saveToConfig();
                         npc.respawn();
-                        plugin.getMessageManager().send(player, "skin_cambiada",
-                            "%npc_id%", String.valueOf(npcId));
+                        plugin.getMessageManager().sendWithPrefix(player,
+                            "&a✔ &7Skin cambiada a &d" + skinName);
+                        player.playSound(player.getLocation(),
+                            org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
                         new ConfigGUI(plugin, npc).open(player);
                     });
             }
             case 13 -> new ModoGUI(plugin, npc).open(player);
             case 14 -> new ProfesionGUI(plugin, npc).open(player);
+            case 15 -> {
+                player.closeInventory();
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&7Escribe el dialogo del NPC en el chat&8:");
+                plugin.getListeners().getChatListener().awaitInput(player,
+                    "&7Escribe el dialogo:", dialogo -> {
+                        npc.setDialogo(dialogo);
+                        npc.saveToConfig();
+                        plugin.getMessageManager().sendWithPrefix(player,
+                            "&a✔ &7Dialogo guardado.");
+                        new ConfigGUI(plugin, npc).open(player);
+                    });
+            }
             case 20 -> {
                 player.closeInventory();
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&7Escribe la escala &8(0.1 - 5.0) &7en el chat&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "Escribe la nueva escala (0.1 - 5.0):", escalaStr -> {
+                    "&7Escribe la nueva escala (0.1 - 5.0):", escalaStr -> {
                         try {
                             double escala = Double.parseDouble(escalaStr);
                             escala = Math.max(0.1, Math.min(5.0, escala));
@@ -163,31 +194,39 @@ public class GUIListener implements Listener {
                             npc.respawn();
                             plugin.getMessageManager().sendWithPrefix(player,
                                 "&a✔ &7Escala cambiada a &e" + escala);
+                            player.playSound(player.getLocation(),
+                                org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
                         } catch (NumberFormatException e) {
-                            plugin.getMessageManager().sendWithPrefix(player, "&cEscala invalida.");
+                            plugin.getMessageManager().sendWithPrefix(player,
+                                "&cEscala invalida. Usa numeros como 1.0 o 2.5");
                         }
                         new ConfigGUI(plugin, npc).open(player);
                     });
             }
+            case 22 -> {
+                npc.setEmocion(nextEmocion(npc.getEmocion()));
+                npc.saveToConfig();
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&a✔ &7Emocion cambiada a &d" + npc.getEmocion());
+                new ConfigGUI(plugin, npc).open(player);
+            }
             case 23 -> {
                 npc.setTiendaActiva(!npc.isTiendaActiva());
                 npc.saveToConfig();
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&a✔ &7Tienda " + (npc.isTiendaActiva() ? "&aACTIVADA" : "&cDESACTIVADA"));
                 new ConfigGUI(plugin, npc).open(player);
             }
             case 31 -> new ConstruirGUI(plugin, npc).open(player);
             case 32 -> new InteraccionFamiliaGUI(plugin, npc).open(player);
             case 37 -> {
-                plugin.getConfirmCallbacks().register(player, confirmed -> {
-                    if (confirmed) {
-                        plugin.getPacketManager().moveNPC(npc, player.getLocation());
-                        npc.saveToConfig();
-                        plugin.getMessageManager().sendWithPrefix(player, "&a✔ &7NPC movido.");
-                    }
-                    new ConfigGUI(plugin, npc).open(player);
-                });
-                new ConfirmGUI(plugin, "Mover NPC",
-                    "Mueve el NPC a tu posicion actual.",
-                    confirmed -> {}).open(player);
+                plugin.getPacketManager().moveNPC(npc, player.getLocation());
+                npc.saveToConfig();
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&a✔ &7NPC movido a tu posicion.");
+                player.playSound(player.getLocation(),
+                    org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1, 1);
+                new ConfigGUI(plugin, npc).open(player);
             }
             case 39 -> {
                 plugin.getConfirmCallbacks().register(player, confirmed -> {
@@ -200,8 +239,8 @@ public class GUIListener implements Listener {
                         new ConfigGUI(plugin, npc).open(player);
                     }
                 });
-                new ConfirmGUI(plugin, "Eliminar NPC",
-                    "Eliminar NPC #" + npcId + " permanentemente.",
+                new ConfirmGUI(plugin, "Eliminar NPC #" + npcId,
+                    "Se eliminara el NPC permanentemente.",
                     confirmed -> {}).open(player);
             }
             case 44 -> new PanelGUI(plugin).open(player);
@@ -209,92 +248,79 @@ public class GUIListener implements Listener {
     }
 
     private void handleProfesionClick(Player player, int slot, ItemStack item) {
-        String title = ChatColor.stripColor(player.getOpenInventory().getTitle());
-        int npcId = extractNPCId(title);
-        if (npcId == -1) {
-            for (NPCEntity npc : plugin.getNPCManager().getAllNPCs()) {
-                if (title.contains(npc.getNombre())) {
-                    npcId = npc.getId();
-                    break;
-                }
-            }
-        }
-        if (npcId == -1) return;
-        final int finalNpcId = npcId;
-        NPCEntity npc = plugin.getNPCManager().getNPC(npcId);
+        NPCEntity npc = getNPCFromOpenInventory(player);
         if (npc == null) return;
+
+        if (slot == 49) {
+            new ConfigGUI(plugin, npc).open(player);
+            return;
+        }
         if (slot == 46) {
             npc.setDormirActivo(!npc.isDormirActivo());
             npc.saveToConfig();
+            plugin.getMessageManager().sendWithPrefix(player,
+                "&7Dormir&8: " + (npc.isDormirActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
             new ProfesionGUI(plugin, npc).open(player);
             return;
         }
         if (slot == 47) {
             npc.setComerActivo(!npc.isComerActivo());
             npc.saveToConfig();
+            plugin.getMessageManager().sendWithPrefix(player,
+                "&7Comer&8: " + (npc.isComerActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
             new ProfesionGUI(plugin, npc).open(player);
             return;
         }
         if (slot == 48) {
             npc.setCaminarActivo(!npc.isCaminarActivo());
             npc.saveToConfig();
+            plugin.getMessageManager().sendWithPrefix(player,
+                "&7Caminar&8: " + (npc.isCaminarActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
             new ProfesionGUI(plugin, npc).open(player);
             return;
         }
         if (slot == 50) {
             npc.setProfesion("NINGUNA");
             npc.saveToConfig();
+            plugin.getTrabajoManager().stopTrabajo(npc);
+            plugin.getMessageManager().sendWithPrefix(player,
+                "&a✔ &7Profesion removida.");
             new ProfesionGUI(plugin, npc).open(player);
             return;
         }
+
         String profesion = getProfesionFromSlot(slot);
         if (profesion == null) return;
-        final String profFinal = profesion;
-        plugin.getConfirmCallbacks().register(player, confirmed -> {
-            if (confirmed) {
-                npc.setProfesion(profFinal);
-                npc.saveToConfig();
-                plugin.getMessageManager().send(player, "profesion_activada",
-                    "%profesion%", profFinal);
-                player.playSound(player.getLocation(),
-                    org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
-                plugin.getTrabajoManager().startTrabajo(npc);
-            }
-            new ProfesionGUI(plugin, npc).open(player);
-        });
-        new ConfirmGUI(plugin, "Asignar Profesion",
-            "Asignar " + profFinal + " al NPC " + npc.getNombre(),
-            confirmed -> {}).open(player);
+
+        npc.setProfesion(profesion);
+        npc.saveToConfig();
+        plugin.getMessageManager().sendWithPrefix(player,
+            "&a✔ &7Profesion cambiada a &6" + profesion);
+        player.playSound(player.getLocation(),
+            org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
+        plugin.getTrabajoManager().startTrabajo(npc);
+        new ProfesionGUI(plugin, npc).open(player);
     }
 
     private void handleModoClick(Player player, int slot, ItemStack item) {
-        String title = ChatColor.stripColor(player.getOpenInventory().getTitle());
-        NPCEntity npc = null;
-        for (NPCEntity n : plugin.getNPCManager().getAllNPCs()) {
-            if (title.contains(n.getNombre())) {
-                npc = n;
-                break;
-            }
-        }
+        NPCEntity npc = getNPCFromOpenInventory(player);
         if (npc == null) return;
+
+        if (slot == 49) {
+            new ConfigGUI(plugin, npc).open(player);
+            return;
+        }
+
         String modo = getModoFromSlot(slot);
         if (modo == null) return;
-        final String modoFinal = modo;
-        final NPCEntity npcFinal = npc;
-        plugin.getConfirmCallbacks().register(player, confirmed -> {
-            if (confirmed) {
-                npcFinal.setModo(modoFinal);
-                npcFinal.saveToConfig();
-                plugin.getMessageManager().sendWithPrefix(player,
-                    "&a✔ &7Modo cambiado a &e" + modoFinal);
-                player.playSound(player.getLocation(),
-                    org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
-            }
-            new ConfigGUI(plugin, npcFinal).open(player);
-        });
-        new ConfirmGUI(plugin, "Cambiar Modo",
-            "Cambiar modo del NPC a " + modoFinal,
-            confirmed -> {}).open(player);
+
+        npc.setModo(modo);
+        npc.saveToConfig();
+        plugin.getMessageManager().sendWithPrefix(player,
+            "&a✔ &7Modo cambiado a &b" + modo);
+        player.playSound(player.getLocation(),
+            org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
+        new ConfigGUI(plugin, npc).open(player);
     }
 
     private void handleConfirmClick(Player player, int slot, ItemStack item) {
@@ -329,88 +355,110 @@ public class GUIListener implements Listener {
     }
 
     private void handleInteraccionClick(Player player, int slot, ItemStack item) {
-        String title = ChatColor.stripColor(player.getOpenInventory().getTitle());
-        NPCEntity npc = null;
-        for (NPCEntity n : plugin.getNPCManager().getAllNPCs()) {
-            if (title.contains(n.getNombre())) { npc = n; break; }
-        }
+        NPCEntity npc = getNPCFromOpenInventory(player);
         if (npc == null) return;
-        final NPCEntity npcFinal = npc;
+
         String key = getInteraccionKey(slot);
-        if (key == null) {
-            if (slot == 28) {
-                player.closeInventory();
-                plugin.getListeners().getChatListener().awaitInput(player,
-                    "Nombre de la pareja:", nombre -> {
-                        plugin.getListeners().getChatListener().awaitInput(player,
-                            "Skin de la pareja (nombre de jugador):", skin -> {
-                                plugin.getFamiliaManager().crearEsposa(npcFinal, nombre, skin);
-                                plugin.getMessageManager().sendWithPrefix(player,
-                                    "&d✦ &7Pareja creada: &d" + nombre);
-                                new InteraccionFamiliaGUI(plugin, npcFinal).open(player);
-                            });
-                    });
-            }
-            if (slot == 30 && npcFinal.getFamiliaEsposaId() != -1) {
-                player.closeInventory();
-                plugin.getListeners().getChatListener().awaitInput(player,
-                    "Nombre del hijo:", nombre -> {
-                        plugin.getListeners().getChatListener().awaitInput(player,
-                            "Skin del hijo:", skin -> {
-                                NPCEntity esposa = plugin.getNPCManager()
-                                    .getNPC(npcFinal.getFamiliaEsposaId());
-                                plugin.getFamiliaManager().crearHijo(npcFinal, esposa, nombre, skin);
-                                plugin.getMessageManager().sendWithPrefix(player,
-                                    "&e✦ &7Hijo creado: &e" + nombre);
-                                new InteraccionFamiliaGUI(plugin, npcFinal).open(player);
-                            });
-                    });
-            }
+        if (key != null) {
+            org.bukkit.configuration.file.FileConfiguration config =
+                plugin.getDataManager().getNPCConfig(npc.getId());
+            boolean activo = config.getBoolean("interacciones." + key, false);
+            config.set("interacciones." + key, !activo);
+            plugin.getDataManager().saveNPCConfig(npc.getId(), config);
+            plugin.getMessageManager().sendWithPrefix(player,
+                "&7Interaccion &e" + key + "&7: " +
+                (!activo ? "&aACTIVADA" : "&cDESACTIVADA"));
+            new InteraccionFamiliaGUI(plugin, npc).open(player);
             return;
         }
-        org.bukkit.configuration.file.FileConfiguration config =
-            plugin.getDataManager().getNPCConfig(npc.getId());
-        boolean activo = config.getBoolean("interacciones." + key, false);
-        config.set("interacciones." + key, !activo);
-        plugin.getDataManager().saveNPCConfig(npc.getId(), config);
-        plugin.getMessageManager().sendWithPrefix(player,
-            "&7Interaccion &e" + key + " &7: " + (!activo ? "&aACTIVADA" : "&cDESACTIVADA"));
-        new InteraccionFamiliaGUI(plugin, npc).open(player);
+
+        final NPCEntity npcFinal = npc;
+        if (slot == 28) {
+            player.closeInventory();
+            plugin.getListeners().getChatListener().awaitInput(player,
+                "&7Nombre de la pareja&8:", nombre -> {
+                    plugin.getListeners().getChatListener().awaitInput(player,
+                        "&7Skin de la pareja&8:", skin -> {
+                            plugin.getFamiliaManager().crearEsposa(npcFinal, nombre, skin);
+                            plugin.getMessageManager().sendWithPrefix(player,
+                                "&d✦ &7Pareja creada&8: &d" + nombre);
+                            new InteraccionFamiliaGUI(plugin, npcFinal).open(player);
+                        });
+                });
+        } else if (slot == 30 && npcFinal.getFamiliaEsposaId() != -1) {
+            player.closeInventory();
+            plugin.getListeners().getChatListener().awaitInput(player,
+                "&7Nombre del hijo&8:", nombre -> {
+                    plugin.getListeners().getChatListener().awaitInput(player,
+                        "&7Skin del hijo&8:", skin -> {
+                            NPCEntity esposa = plugin.getNPCManager()
+                                .getNPC(npcFinal.getFamiliaEsposaId());
+                            plugin.getFamiliaManager().crearHijo(npcFinal, esposa, nombre, skin);
+                            plugin.getMessageManager().sendWithPrefix(player,
+                                "&e✦ &7Hijo creado&8: &e" + nombre);
+                            new InteraccionFamiliaGUI(plugin, npcFinal).open(player);
+                        });
+                });
+        } else if (slot == 49) {
+            new ConfigGUI(plugin, npc).open(player);
+        }
     }
 
     private void handleConstruirClick(Player player, int slot, ItemStack item, String title) {
-        NPCEntity npc = null;
-        for (NPCEntity n : plugin.getNPCManager().getAllNPCs()) {
-            if (title.contains(n.getNombre())) { npc = n; break; }
-        }
+        NPCEntity npc = getNPCFromOpenInventory(player);
         if (npc == null) return;
-        final NPCEntity npcFinal = npc;
+
         switch (slot) {
             case 20 -> {
-                npcFinal.setLocation(player.getLocation());
-                npcFinal.saveToConfig();
+                npc.setLocation(player.getLocation());
+                npc.saveToConfig();
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&a✔ &7Punto de inicio definido.");
-                new ConstruirGUI(plugin, npcFinal).open(player);
+                new ConstruirGUI(plugin, npc).open(player);
             }
             case 31 -> {
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&a✔ &7Construccion iniciada.");
-                plugin.getLogManager().log(npcFinal.getId(),
-                    npcFinal.getNombre() + " inicio construccion.");
-                new ConstruirGUI(plugin, npcFinal).open(player);
+                plugin.getLogManager().log(npc.getId(),
+                    npc.getNombre() + " inicio construccion.");
+                new ConstruirGUI(plugin, npc).open(player);
             }
             case 32 -> {
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&e⚠ &7Construccion pausada.");
-                new ConstruirGUI(plugin, npcFinal).open(player);
+                new ConstruirGUI(plugin, npc).open(player);
             }
             case 33 -> {
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&c✖ &7Construccion cancelada.");
-                new ConstruirGUI(plugin, npcFinal).open(player);
+                new ConstruirGUI(plugin, npc).open(player);
             }
+            case 49 -> new ConfigGUI(plugin, npc).open(player);
         }
+    }
+
+    private NPCEntity getNPCFromOpenInventory(Player player) {
+        String title = ChatColor.stripColor(player.getOpenInventory().getTitle());
+        int id = extractNPCId(title);
+        if (id != -1) {
+            NPCEntity npc = plugin.getNPCManager().getNPC(id);
+            if (npc != null) return npc;
+        }
+        for (NPCEntity npc : plugin.getNPCManager().getAllNPCs()) {
+            if (title.contains(npc.getNombre())) return npc;
+        }
+        return null;
+    }
+
+    private String nextEmocion(String actual) {
+        return switch (actual) {
+            case "NEUTRAL" -> "FELIZ";
+            case "FELIZ" -> "TRISTE";
+            case "TRISTE" -> "ENOJADO";
+            case "ENOJADO" -> "ASUSTADO";
+            case "ASUSTADO" -> "NEUTRAL";
+            default -> "NEUTRAL";
+        };
     }
 
     private String getProfesionFromSlot(int slot) {
@@ -458,13 +506,21 @@ public class GUIListener implements Listener {
     private int extractNPCId(String title) {
         try {
             int start = title.indexOf("#") + 1;
+            if (start == 0) return -1;
             int end = title.indexOf(" ", start);
             if (end == -1) end = title.length();
             return Integer.parseInt(title.substring(start, end).trim());
         } catch (Exception e) { return -1; }
     }
 
-    private int getCurrentPage(Player player) {
+    private int extractPage(String title) {
+        try {
+            if (title.contains("Pagina")) {
+                int idx = title.indexOf("Pagina") + 6;
+                String num = title.substring(idx).trim().split(" ")[0];
+                return Integer.parseInt(num) - 1;
+            }
+        } catch (Exception ignored) {}
         return 0;
     }
 
