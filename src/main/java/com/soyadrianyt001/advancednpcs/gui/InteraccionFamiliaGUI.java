@@ -26,7 +26,7 @@ public class InteraccionFamiliaGUI {
 
     public void open(Player player) {
         Inventory inv = Bukkit.createInventory(null, 54,
-            color("&8[&d&l✦ &7Interacciones Familiares &d&l✦&8]"));
+            color("&8[&d&l✦ &7Interacciones Familiares &e#" + npc.getId() + " &d&l✦&8]"));
         setBorder(inv);
         inv.setItem(10, createToggle("abrazo", Material.PINK_WOOL,
             "&d&l✦ ABRAZO A LA ESPOSA &d&l✦",
@@ -66,11 +66,12 @@ public class InteraccionFamiliaGUI {
         if (npc.getFamiliaHijoId() == -1 && npc.getFamiliaEsposaId() != -1) {
             inv.setItem(30, createSpawnHijo());
         }
-        inv.setItem(49, createCredits());
+        inv.setItem(49, createVolver());
         player.openInventory(inv);
     }
 
-    private ItemStack createToggle(String key, Material mat, String name, String desc1, String desc2) {
+    private ItemStack createToggle(String key, Material mat, String name,
+                                    String desc1, String desc2) {
         boolean activo = isActive(key);
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
@@ -107,7 +108,6 @@ public class InteraccionFamiliaGUI {
             color("&7Crea un NPC pareja"),
             color("&7vinculado a este NPC."),
             color(" "),
-            color("&5✦ &7Creado por &bsoyadrianyt001 &5✦"),
             color("&d&l» CLICK PARA CREAR «"),
             color("&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
         ));
@@ -124,9 +124,19 @@ public class InteraccionFamiliaGUI {
             color("&7Crea un mini NPC hijo"),
             color("&7para esta familia."),
             color(" "),
-            color("&5✦ &7Creado por &bsoyadrianyt001 &5✦"),
             color("&e&l» CLICK PARA CREAR «"),
             color("&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
+        ));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack createVolver() {
+        ItemStack item = new ItemStack(Material.ARROW);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(color("&7&l← VOLVER AL CONFIG"));
+        meta.setLore(Arrays.asList(
+            color("&7Regresa al menu de configuracion.")
         ));
         item.setItemMeta(meta);
         return item;
@@ -139,7 +149,10 @@ public class InteraccionFamiliaGUI {
 
     private void setBorder(Inventory inv) {
         int[] borderSlots = {0,1,2,3,4,5,6,7,8,9,17,18,26,27,35,36,44,45,46,47,48,50,51,52,53};
-        Material[] colors = {Material.PINK_STAINED_GLASS_PANE, Material.MAGENTA_STAINED_GLASS_PANE};
+        Material[] colors = {
+            Material.PINK_STAINED_GLASS_PANE,
+            Material.MAGENTA_STAINED_GLASS_PANE
+        };
         long time = System.currentTimeMillis() / 500;
         int colorIndex = (int)(time % colors.length);
         for (int slot : borderSlots) {
@@ -149,18 +162,6 @@ public class InteraccionFamiliaGUI {
             glass.setItemMeta(meta);
             inv.setItem(slot, glass);
         }
-    }
-
-    private ItemStack createCredits() {
-        ItemStack item = new ItemStack(Material.NETHER_STAR);
-        ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(color("&5✦ &bAdvancedNPCS &d&lPremium &5✦"));
-        meta.setLore(Arrays.asList(
-            color("&7Creado por &bsoyadrianyt001"),
-            color("&7Version&8: &ev1.0.0")
-        ));
-        item.setItemMeta(meta);
-        return item;
     }
 
     private String color(String text) {
