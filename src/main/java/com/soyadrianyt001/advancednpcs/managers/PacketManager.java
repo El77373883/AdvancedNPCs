@@ -107,7 +107,7 @@ public class PacketManager {
             String displayName = npc.getNombre().length() > 16
                 ? npc.getNombre().substring(0, 16) : npc.getNombre();
 
-            // ✅ CORREGIDO: usar NMS GameProfile directamente para evitar GET_PROPERTIES null
+            // ✅ Usar NMS GameProfile directamente
             GameProfile nmsProfile = new GameProfile(uuid, displayName);
             if (profile != null) {
                 try {
