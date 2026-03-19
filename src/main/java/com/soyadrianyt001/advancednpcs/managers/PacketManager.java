@@ -168,11 +168,11 @@ public class PacketManager {
             rotHead.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
             protocolManager.sendServerPacket(player, rotHead);
 
-            // 4) Metadata con WrappedDataValue para 1.21
+            // 4) Metadata - ✅ CORREGIDO para 1.21
             List<WrappedDataValue> dataValues = new ArrayList<>();
             dataValues.add(new WrappedDataValue(
                 17,
-                WrappedRegistry.get(WrappedDataValue.getSerializer(Byte.class)),
+                WrappedDataWatcher.Registry.get(Byte.class),
                 (byte) 127
             ));
             PacketContainer metadata = protocolManager.createPacket(
