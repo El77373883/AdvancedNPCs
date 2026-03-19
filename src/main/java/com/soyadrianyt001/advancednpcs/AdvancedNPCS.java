@@ -28,6 +28,7 @@ public class AdvancedNPCS extends JavaPlugin {
     private ClimatiManager climatiManager;
     private ConfirmCallbacks confirmCallbacks;
     private ListenerManager listenerManager;
+    private SkinManager skinManager;
 
     @Override
     public void onEnable() {
@@ -48,6 +49,7 @@ public class AdvancedNPCS extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (packetManager != null) packetManager.despawnAll();
         if (npcManager != null) npcManager.saveAll();
         if (dataManager != null) dataManager.saveAll();
         printShutdownMessage();
@@ -73,7 +75,8 @@ public class AdvancedNPCS extends JavaPlugin {
 
     private boolean setupEconomy() {
         if (getServer().getPluginManager().getPlugin("Vault") == null) return false;
-        RegisteredServiceProvider<Economy> rsp = getServer().getServicesManager().getRegistration(Economy.class);
+        RegisteredServiceProvider<Economy> rsp =
+            getServer().getServicesManager().getRegistration(Economy.class);
         if (rsp == null) return false;
         economy = rsp.getProvider();
         return economy != null;
@@ -83,6 +86,7 @@ public class AdvancedNPCS extends JavaPlugin {
         dataManager = new DataManager(this);
         messageManager = new MessageManager(this);
         logManager = new LogManager(this);
+        skinManager = new SkinManager(this);
         packetManager = new PacketManager(this);
         confirmCallbacks = new ConfirmCallbacks(this);
         npcManager = new NPCManager(this);
@@ -120,4 +124,5 @@ public class AdvancedNPCS extends JavaPlugin {
     public ClimatiManager getClimatiManager() { return climatiManager; }
     public ConfirmCallbacks getConfirmCallbacks() { return confirmCallbacks; }
     public ListenerManager getListeners() { return listenerManager; }
+    public SkinManager getSkinManager() { return skinManager; }
 }
