@@ -3,7 +3,6 @@ package com.soyadrianyt001.advancednpcs.commands;
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.gui.PanelGUI;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
-import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -28,7 +27,7 @@ public class AnpcCommand implements CommandExecutor {
             return true;
         }
         if (args.length == 0) {
-            plugin.getMessageManager().send(player, "comando_invalido");
+            sendHelp(player);
             return true;
         }
         switch (args[0].toLowerCase()) {
@@ -45,13 +44,24 @@ public class AnpcCommand implements CommandExecutor {
                     return true;
                 }
                 if (args.length < 2) {
-                    plugin.getMessageManager().sendWithPrefix(player, "&7Uso: &e/anpc create &8<nombre>");
+                    plugin.getMessageManager().sendWithPrefix(player,
+                        "&7Uso: &e/anpc create &8<nombre> &8[tipo]");
+                    plugin.getMessageManager().sendWithPrefix(player,
+                        "&7Tipos: &ePLAYER&7, &eZOMBIE&7, &eVILLAGER&7, &eSKELETON&7, &eCREEPER&7, &eBLAZE&7, &eENDERMAN&7, &eWITCH&7, &ePIGLIN&7, &eIRON_GOLEM");
                     return true;
                 }
                 String nombre = args[1];
+                String tipo = args.length >= 3 ? args[2].toUpperCase() : "PLAYER";
                 NPCEntity npc = plugin.getNPCManager().createNPC(nombre, player.getLocation(), player);
+                npc.setTipo(tipo);
+                npc.saveToConfig();
+                plugin.getNPCManager().spawnNPCEntity(npc);
                 plugin.getMessageManager().send(player, "npc_creado",
                     "%npc_id%", String.valueOf(npc.getId()));
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&7Tipo&8: &e" + tipo + " &7ID&8: &b#" + npc.getId());
+                player.playSound(player.getLocation(),
+                    org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
             }
             case "delete" -> {
                 if (!player.isOp() && !player.hasPermission("advancednpcs.delete")) {
@@ -97,43 +107,41 @@ public class AnpcCommand implements CommandExecutor {
                 new com.soyadrianyt001.advancednpcs.gui.ConfigGUI(plugin, npc).open(player);
             }
             case "move" -> {
-                if (!player.isOp() && !player.hasPermission("advancednpcs.edit")) {
+                if (!player.isOp()) {
                     plugin.getMessageManager().send(player, "sin_permiso");
                     return true;
                 }
-                if (args.length < 2) {
-                    plugin.getMessageManager().sendWithPrefix(player, "&7Uso: &e/anpc move &8<id>");
-                    return true;
-                }
+                if (args.length < 2) return true;
                 try {
                     int id = Integer.parseInt(args[1]);
                     NPCEntity npc = plugin.getNPCManager().getNPC(id);
-                    if (npc == null) {
-                        plugin.getMessageManager().send(player, "npc_no_existe", "%npc_id%", args[1]);
-                        return true;
-                    }
+                    if (npc == null) return true;
                     plugin.getPacketManager().moveNPC(npc, player.getLocation());
                     npc.saveToConfig();
-                    plugin.getMessageManager().sendWithPrefix(player, "&a✔ &7NPC movido a tu posicion.");
+                    plugin.getMessageManager().sendWithPrefix(player, "&a✔ &7NPC movido.");
                 } catch (NumberFormatException e) {
                     plugin.getMessageManager().sendWithPrefix(player, "&cID invalido.");
                 }
             }
             case "list" -> {
-                player.sendMessage(plugin.getMessageManager().color("&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"));
-                player.sendMessage(plugin.getMessageManager().color("&b&l✦ &7Lista de NPCs &b&l✦"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&b&l✦ &7Lista de NPCs &b&l✦"));
                 for (NPCEntity npc : plugin.getNPCManager().getAllNPCs()) {
                     player.sendMessage(plugin.getMessageManager().color(
                         "&8#&e" + npc.getId() + " &7- &b" + npc.getNombre() +
+                        " &8| &7Tipo&8: &e" + npc.getTipo() +
                         " &8| &7Modo&8: &e" + npc.getModo() +
                         " &8| &7Profesion&8: &e" + npc.getProfesion()));
                 }
                 player.sendMessage(plugin.getMessageManager().color(
                     "&7Total&8: &e" + plugin.getNPCManager().getTotalNPCs() + " &7NPCs"));
-                player.sendMessage(plugin.getMessageManager().color("&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"));
             }
             case "reload" -> {
-                if (!player.isOp() && !player.hasPermission("advancednpcs.reload")) {
+                if (!player.isOp()) {
                     plugin.getMessageManager().send(player, "sin_permiso");
                     return true;
                 }
@@ -161,50 +169,47 @@ public class AnpcCommand implements CommandExecutor {
                     plugin.getMessageManager().sendWithPrefix(player, "&cID invalido.");
                 }
             }
-            case "combat" -> {
-                if (args.length < 2) return true;
-                try {
-                    int id = Integer.parseInt(args[1]);
-                    NPCEntity npc = plugin.getNPCManager().getNPC(id);
-                    if (npc == null) return true;
-                    npc.setCombateActivo(!npc.isCombateActivo());
-                    npc.saveToConfig();
-                    plugin.getMessageManager().sendWithPrefix(player,
-                        "&7Combate del NPC &e" + npc.getNombre() + " &7: " +
-                        (npc.isCombateActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
-                } catch (NumberFormatException e) {
-                    plugin.getMessageManager().sendWithPrefix(player, "&cID invalido.");
-                }
-            }
             case "version" -> {
-                player.sendMessage(plugin.getMessageManager().color("&8╔══════════════════════════════════════════╗"));
-                player.sendMessage(plugin.getMessageManager().color("&8║   &b&l⚡ AdvancedNPCS &5✦ &d&lPremium &8- &7Version   ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8╠══════════════════════════════════════════╣"));
-                player.sendMessage(plugin.getMessageManager().color("&8║   &7Version actual&8:  &e" + plugin.getVersionChecker().getCurrentVersion() + "                ║"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8╔══════════════════════════════════════════╗"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8║   &b&l⚡ AdvancedNPCS &5✦ &d&lPremium &8- &7Version   ║"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8╠══════════════════════════════════════════╣"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8║   &7Version actual&8: &ev" +
+                    plugin.getVersionChecker().getCurrentVersion() + "                ║"));
                 if (plugin.getVersionChecker().isUpdated()) {
-                    player.sendMessage(plugin.getMessageManager().color("&8║   &7Estado&8:         &a&l✔ Estas actualizado!    ║"));
+                    player.sendMessage(plugin.getMessageManager().color(
+                        "&8║   &7Estado&8: &a&l✔ Estas actualizado!         ║"));
                 } else {
-                    player.sendMessage(plugin.getMessageManager().color("&8║   &7Nueva version&8:  &a" + plugin.getVersionChecker().getLatestVersion() + "               ║"));
-                    player.sendMessage(plugin.getMessageManager().color("&8║   &6&l⚠ &e¡Hay una nueva version disponible!    ║"));
+                    player.sendMessage(plugin.getMessageManager().color(
+                        "&8║   &6&l⚠ &e¡Nueva version disponible!          ║"));
                 }
-                player.sendMessage(plugin.getMessageManager().color("&8╠══════════════════════════════════════════╣"));
-                player.sendMessage(plugin.getMessageManager().color("&8║   &5✦ &dAdvancedNPCS Premium &8| &bsoyadrianyt001 &5✦  ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8╚══════════════════════════════════════════╝"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8╠══════════════════════════════════════════╣"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8║   &5✦ &dAdvancedNPCS Premium &8| &bsoyadrianyt001 &5✦ ║"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8╚══════════════════════════════════════════╝"));
             }
             case "creator" -> {
-                player.sendMessage(plugin.getMessageManager().color("&8╔════════════════════════════════════════════╗"));
-                player.sendMessage(plugin.getMessageManager().color("&8║                                            ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8║   &b&l  ⚡ AdvancedNPCS &5✦ &d&lPremium ⚡            ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8║                                            ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8║   &7Este plugin fue creado con &d&l♥ &7por&8:        ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8║                                            ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8║        &b&l★ &e&lsoyadrianyt001 &b&l★               ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8║                                            ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8║   &5✦ &dDesarrollador Principal &5✦               ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8║   &7GitHub&8: &bgithub.com/soyadrianyt001          ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8║                                            ║"));
-                player.sendMessage(plugin.getMessageManager().color("&8╚════════════════════════════════════════════╝"));
-                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8╔════════════════════════════════════════════╗"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8║   &b&l  ⚡ AdvancedNPCS &5✦ &d&lPremium ⚡            ║"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8║   &7Este plugin fue creado con &d&l♥ &7por&8:        ║"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8║        &b&l★ &e&lsoyadrianyt001 &b&l★               ║"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8║   &5✦ &dDesarrollador Principal &5✦               ║"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8║   &7GitHub&8: &bgithub.com/soyadrianyt001          ║"));
+                player.sendMessage(plugin.getMessageManager().color(
+                    "&8╚════════════════════════════════════════════╝"));
+                player.playSound(player.getLocation(),
+                    org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
             }
             case "logs" -> {
                 if (!player.isOp()) {
@@ -212,19 +217,17 @@ public class AnpcCommand implements CommandExecutor {
                     return true;
                 }
                 if (args.length < 2) return true;
-                if (args[1].equalsIgnoreCase("all")) {
-                    plugin.getMessageManager().sendWithPrefix(player, "&7Usa &e/anpc logs <id> &7para ver logs especificos.");
-                    return true;
-                }
                 if (args[1].equalsIgnoreCase("clear") && args.length >= 3) {
                     if (args[2].equalsIgnoreCase("all")) {
                         plugin.getLogManager().clearAllLogs();
-                        plugin.getMessageManager().sendWithPrefix(player, "&a✔ &7Todos los logs eliminados.");
+                        plugin.getMessageManager().sendWithPrefix(player,
+                            "&a✔ &7Todos los logs eliminados.");
                     } else {
                         try {
                             int id = Integer.parseInt(args[2]);
                             plugin.getLogManager().clearLogs(id);
-                            plugin.getMessageManager().sendWithPrefix(player, "&a✔ &7Logs del NPC &e" + id + " &7eliminados.");
+                            plugin.getMessageManager().sendWithPrefix(player,
+                                "&a✔ &7Logs del NPC &e" + id + " &7eliminados.");
                         } catch (NumberFormatException e) {
                             plugin.getMessageManager().sendWithPrefix(player, "&cID invalido.");
                         }
@@ -234,9 +237,11 @@ public class AnpcCommand implements CommandExecutor {
                 try {
                     int id = Integer.parseInt(args[1]);
                     java.util.List<String> logs = plugin.getLogManager().getLogs(id);
-                    player.sendMessage(plugin.getMessageManager().color("&b&l✦ &7Logs del NPC &e#" + id + " &b&l✦"));
+                    player.sendMessage(plugin.getMessageManager().color(
+                        "&b&l✦ &7Logs del NPC &e#" + id + " &b&l✦"));
                     if (logs.isEmpty()) {
-                        player.sendMessage(plugin.getMessageManager().color("&7Sin logs disponibles."));
+                        player.sendMessage(plugin.getMessageManager().color(
+                            "&7Sin logs disponibles."));
                     } else {
                         for (String log : logs) {
                             player.sendMessage(plugin.getMessageManager().color("&7" + log));
@@ -253,24 +258,49 @@ public class AnpcCommand implements CommandExecutor {
     }
 
     private void sendHelp(Player player) {
-        player.sendMessage(plugin.getMessageManager().color("&8╔══════════════════════════════════════════════╗"));
-        player.sendMessage(plugin.getMessageManager().color("&8║      &b&l⚡ AdvancedNPCS &5✦ &d&lPremium &b⚡ &r&8            ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║      &7Creado por &bsoyadrianyt001                 ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8╠══════════════════════════════════════════════╣"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc panel              &7→ &aAbrir panel        ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc create &8<nombre>   &7→ &aCrear NPC         ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc delete &8<id>       &7→ &cEliminar NPC      ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc edit &8<id/nombre>  &7→ &bEditar NPC        ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc move &8<id>         &7→ &6Mover NPC         ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc list               &7→ &7Ver todos          ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc follow &8<id>       &7→ &aSeguidor toggle    ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc combat &8<id>       &7→ &cCombate toggle     ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc logs &8<id>         &7→ &7Ver logs           ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc reload             &7→ &aRecargar config    ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc version            &7→ &7Ver version        ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8║  &e/anpc creator            &7→ &dVer autor          ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8╠══════════════════════════════════════════════╣"));
-        player.sendMessage(plugin.getMessageManager().color("&8║   &5✦ &dAdvancedNPCS Premium &8| &7v1.0.0 &8| &bPaper 1.21.1 ║"));
-        player.sendMessage(plugin.getMessageManager().color("&8╚══════════════════════════════════════════════╝"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8╔══════════════════════════════════════════════╗"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║      &b&l⚡ AdvancedNPCS &5✦ &d&lPremium &b⚡ &r&8            ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║      &7Creado por &bsoyadrianyt001                 ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8╠══════════════════════════════════════════════╣"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc panel                &7→ &aAbrir panel        ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc create &8<nombre> &8[tipo] &7→ &aCrear NPC      ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc delete &8<id>          &7→ &cEliminar NPC      ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc edit &8<id/nombre>     &7→ &bEditar NPC        ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc move &8<id>            &7→ &6Mover NPC         ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc list                  &7→ &7Ver todos          ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc follow &8<id>          &7→ &aSeguidor toggle    ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc logs &8<id>            &7→ &7Ver logs           ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc reload                &7→ &aRecargar config    ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc version               &7→ &7Ver version        ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &e/anpc creator               &7→ &dVer autor          ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8╠══════════════════════════════════════════════╣"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &7Tipos&8: &ePLAYER&7, &eZOMBIE&7, &eVILLAGER&7, &eSKELETON    ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &7       &eCREEPER&7, &eBLAZE&7, &eENDERMAN&7, &eWITCH        ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║  &7       &ePIGLIN&7, &eIRON_GOLEM&7, &eWARDEN             ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8╠══════════════════════════════════════════════╣"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8║   &5✦ &dAdvancedNPCS Premium &8| &7v1.0.0 &8| &bPaper 1.21.1 ║"));
+        player.sendMessage(plugin.getMessageManager().color(
+            "&8╚══════════════════════════════════════════════╝"));
     }
 }
