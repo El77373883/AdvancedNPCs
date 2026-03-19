@@ -2,13 +2,14 @@ package com.soyadrianyt001.advancednpcs.managers;
 
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.*;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.metadata.FixedMetadataValue;
-import org.bukkit.profile.PlayerProfile;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
@@ -125,25 +126,42 @@ public class PacketManager {
             ArmorStand stand = loc.getWorld().spawn(loc, ArmorStand.class, e -> {
                 e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
                 e.setCustomNameVisible(true);
-                e.setVisible(true);
-                e.setGravity(false);
+                e.setVisible(false);
+                e.setGravity(true);
                 e.setInvulnerable(true);
                 e.setArms(true);
                 e.setBasePlate(false);
+                e.setSmall(false);
                 e.setMetadata("advancednpc", new FixedMetadataValue(plugin, npc.getId()));
                 e.setRemoveWhenFarAway(false);
+
                 ItemStack helmet = new ItemStack(Material.PLAYER_HEAD);
-                SkullMeta meta = (SkullMeta) helmet.getItemMeta();
+                SkullMeta skullMeta = (SkullMeta) helmet.getItemMeta();
                 if (profile != null) {
-                    meta.setOwnerProfile(profile);
+                    skullMeta.setOwnerProfile(profile);
                 } else {
-                    meta.setOwner(npc.getSkin());
+                    skullMeta.setOwner(npc.getSkin());
                 }
-                helmet.setItemMeta(meta);
+                helmet.setItemMeta(skullMeta);
                 e.setHelmet(helmet);
-                e.setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
-                e.setLeggings(new ItemStack(Material.LEATHER_LEGGINGS));
-                e.setBoots(new ItemStack(Material.LEATHER_BOOTS));
+
+                ItemStack chestplate = new ItemStack(Material.LEATHER_CHESTPLATE);
+                LeatherArmorMeta chestMeta = (LeatherArmorMeta) chestplate.getItemMeta();
+                chestMeta.setColor(Color.fromRGB(139, 90, 43));
+                chestplate.setItemMeta(chestMeta);
+                e.setChestplate(chestplate);
+
+                ItemStack leggings = new ItemStack(Material.LEATHER_LEGGINGS);
+                LeatherArmorMeta legsMeta = (LeatherArmorMeta) leggings.getItemMeta();
+                legsMeta.setColor(Color.fromRGB(70, 50, 20));
+                leggings.setItemMeta(legsMeta);
+                e.setLeggings(leggings);
+
+                ItemStack boots = new ItemStack(Material.LEATHER_BOOTS);
+                LeatherArmorMeta bootsMeta = (LeatherArmorMeta) boots.getItemMeta();
+                bootsMeta.setColor(Color.fromRGB(50, 30, 10));
+                boots.setItemMeta(bootsMeta);
+                e.setBoots(boots);
             });
             spawnedEntities.put(npc.getId(), stand);
             ArmorStand holo = spawnHologram(npc, loc);
@@ -229,7 +247,7 @@ public class PacketManager {
                 default -> loc.getWorld().spawn(loc, ArmorStand.class, e -> {
                     e.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
                     e.setCustomNameVisible(true);
-                    e.setVisible(true);
+                    e.setVisible(false);
                     e.setGravity(false);
                     e.setInvulnerable(true);
                     e.setArms(true);
@@ -241,7 +259,7 @@ public class PacketManager {
             return loc.getWorld().spawn(loc, ArmorStand.class, stand -> {
                 stand.setCustomName(plugin.getMessageManager().color("&b" + npc.getNombre()));
                 stand.setCustomNameVisible(true);
-                stand.setVisible(true);
+                stand.setVisible(false);
                 stand.setGravity(false);
                 stand.setInvulnerable(true);
                 stand.setArms(true);
@@ -275,7 +293,8 @@ public class PacketManager {
             e.setInvulnerable(true);
             e.setSmall(true);
             e.setMarker(true);
-            e.setMetadata("advancednpc_holo", new FixedMetadataValue(plugin, npc.getId()));
+            e.setMetadata("advancednpc_holo",
+                new FixedMetadataValue(plugin, npc.getId()));
         });
         holoEntities.put(npc.getId(), holo);
         return holo;
