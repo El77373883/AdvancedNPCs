@@ -1,0 +1,56 @@
+name: AdvancedNPCS
+version: 1.0.0
+main: com.soyadrianyt001.advancednpcs.AdvancedNPCS
+api-version: '1.21'
+author: soyadrianyt001
+description: AdvancedNPCS Premium - Creado por soyadrianyt001
+website: https://github.com/soyadrianyt001
+
+commands:
+  anpc:
+    description: Comando principal de AdvancedNPCS
+    usage: /anpc <subcomando>
+    permission: advancednpcs.use
+  quest:
+    description: Comando de misiones
+    usage: /quest <subcomando>
+    permission: advancednpcs.quest.use
+  rep:
+    description: Comando de reputacion
+    usage: /rep <subcomando>
+    permission: advancednpcs.use
+
+permissions:
+  advancednpcs.*:
+    description: Acceso total
+    default: op
+  advancednpcs.use:
+    description: Uso basico
+    default: true
+  advancednpcs.create:
+    description: Crear NPCs
+    default: op
+  advancednpcs.delete:
+    description: Eliminar NPCs
+    default: op
+  advancednpcs.edit:
+    description: Editar NPCs
+    default: op
+  advancednpcs.panel:
+    description: Abrir panel
+    default: op
+  advancednpcs.reload:
+    description: Recargar config
+    default: op
+  advancednpcs.shop.use:
+    description: Usar tiendas
+    default: true
+  advancednpcs.quest.use:
+    description: Usar misiones
+    default: true
+  advancednpcs.guard.bypass:
+    description: Guardias no te atacan
+    default: op
+  advancednpcs.versioncheck:
+    description: Avisos de version
+    default: op
