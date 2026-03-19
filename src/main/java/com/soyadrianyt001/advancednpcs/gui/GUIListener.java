@@ -173,10 +173,12 @@ public class GUIListener implements Listener {
                     "&7Escribe el dialogo del NPC en el chat&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
                     "&7Escribe el dialogo:", dialogo -> {
-                        npc.setDialogo(dialogo);
-                        npc.saveToConfig();
+                        org.bukkit.configuration.file.FileConfiguration config =
+                            plugin.getDataManager().getNPCConfig(npc.getId());
+                        config.set("dialogo", dialogo);
+                        plugin.getDataManager().saveNPCConfig(npc.getId(), config);
                         plugin.getMessageManager().sendWithPrefix(player,
-                            "&a✔ &7Dialogo guardado.");
+                            "&a✔ &7Dialogo guardado&8: &7" + dialogo);
                         new ConfigGUI(plugin, npc).open(player);
                     });
             }
