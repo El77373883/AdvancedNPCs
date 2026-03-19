@@ -5,8 +5,11 @@ import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import java.util.Arrays;
@@ -111,8 +114,8 @@ public class ProfesionGUI {
         lore.add(color(activa ? "&a✔ ACTIVA - Click para desactivar" : "&c✖ INACTIVA - Click para activar"));
         lore.add(color("&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"));
         if (activa) {
-            meta.addEnchant(org.bukkit.enchantments.Enchantment.LUCK, 1, true);
-            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+            meta.addEnchant(Enchantment.getByKey(NamespacedKey.minecraft("unbreaking")), 1, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         }
         meta.setLore(lore);
         item.setItemMeta(meta);
@@ -122,7 +125,8 @@ public class ProfesionGUI {
     private ItemStack createToggle(String nombre, Material mat, boolean activo) {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(color((activo ? "&a&l✦ " : "&c&l✦ ") + nombre + (activo ? " &8| &a&lACTIVADO" : " &8| &c&lDESACTIVADO")));
+        meta.setDisplayName(color((activo ? "&a&l✦ " : "&c&l✦ ") + nombre +
+            (activo ? " &8| &a&lACTIVADO" : " &8| &c&lDESACTIVADO")));
         meta.setLore(Arrays.asList(
             color("&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"),
             color("&7Estado&8: " + (activo ? "&aACTIVADO" : "&cDESACTIVADO")),
