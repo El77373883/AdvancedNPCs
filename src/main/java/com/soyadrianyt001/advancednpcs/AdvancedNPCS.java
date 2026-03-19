@@ -29,6 +29,7 @@ public class AdvancedNPCS extends JavaPlugin {
     private ConfirmCallbacks confirmCallbacks;
     private ListenerManager listenerManager;
     private SkinManager skinManager;
+    private DialogoManager dialogoManager;
 
     @Override
     public void onEnable() {
@@ -89,7 +90,6 @@ public class AdvancedNPCS extends JavaPlugin {
         skinManager = new SkinManager(this);
         packetManager = new PacketManager(this);
         confirmCallbacks = new ConfirmCallbacks(this);
-        npcManager = new NPCManager(this);
         trabajoManager = new TrabajoManager(this);
         familiaManager = new FamiliaManager(this);
         policiaManager = new PoliciaManager(this);
@@ -98,6 +98,8 @@ public class AdvancedNPCS extends JavaPlugin {
         particulasManager = new PartikulasManager(this);
         climatiManager = new ClimatiManager(this);
         versionChecker = new VersionChecker(this);
+        dialogoManager = new DialogoManager(this);
+        npcManager = new NPCManager(this);
         listenerManager = new ListenerManager(this);
     }
 
@@ -125,4 +127,5 @@ public class AdvancedNPCS extends JavaPlugin {
     public ConfirmCallbacks getConfirmCallbacks() { return confirmCallbacks; }
     public ListenerManager getListeners() { return listenerManager; }
     public SkinManager getSkinManager() { return skinManager; }
+    public DialogoManager getDialogoManager() { return dialogoManager; }
 }
