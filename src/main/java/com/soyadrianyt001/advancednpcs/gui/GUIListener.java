@@ -49,9 +49,7 @@ public class GUIListener implements Listener {
             return;
         }
         if (title.contains("⚠") || titleStripped.contains("Confirmar") ||
-            titleStripped.contains("seguro") || titleStripped.contains("Eliminar NPC") ||
-            titleStripped.contains("Mover NPC") || titleStripped.contains("Asignar") ||
-            titleStripped.contains("Cambiar Modo")) {
+            titleStripped.contains("seguro") || titleStripped.contains("Eliminar NPC")) {
             event.setCancelled(true);
             handleConfirmClick(player, event.getSlot(), event.getCurrentItem());
             return;
@@ -142,7 +140,7 @@ public class GUIListener implements Listener {
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&7Escribe el nuevo &enombre &7del NPC en el chat&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "&7Escribe el nuevo nombre:", nombre -> {
+                    "&7Nombre:", nombre -> {
                         npc.setNombre(nombre);
                         npc.saveToConfig();
                         plugin.getPacketManager().updateNameTag(npc);
@@ -158,7 +156,7 @@ public class GUIListener implements Listener {
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&7Escribe el nombre del jugador para la &dskin&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
-                    "&7Escribe la skin:", skinName -> {
+                    "&7Skin:", skinName -> {
                         npc.setSkin(skinName);
                         npc.saveToConfig();
                         npc.respawn();
@@ -174,7 +172,7 @@ public class GUIListener implements Listener {
             case 15 -> {
                 player.closeInventory();
                 plugin.getMessageManager().sendWithPrefix(player,
-                    "&7Escribe el dialogo del NPC en el chat&8:");
+                    "&7Escribe el dialogo del NPC&8:");
                 plugin.getListeners().getChatListener().awaitInput(player,
                     "&7Dialogo:", dialogo -> {
                         org.bukkit.configuration.file.FileConfiguration config =
@@ -189,7 +187,7 @@ public class GUIListener implements Listener {
             case 16 -> {
                 player.closeInventory();
                 plugin.getMessageManager().sendWithPrefix(player,
-                    "&7Tipos&8: &eHEART&7, &eCRIT&7, &eSNOWFLAKE&7, &eWITCH&7, &eFLAME&7, &eCLOUD");
+                    "&7Tipos&8: &eHEART&7, &eCRIT&7, &eSNOWFLAKE&7, &eWITCH&7, &eFLAME");
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&7Modo&8: &eNORMAL&7, &eAURA&7, &eCORONA&7, &eRASTRO &8- &7Ej&8: &eHEART:AURA");
                 plugin.getListeners().getChatListener().awaitInput(player,
@@ -203,7 +201,8 @@ public class GUIListener implements Listener {
                             plugin.getParticulasManager().stopParticles(npc);
                             plugin.getParticulasManager().startParticles(npc);
                             plugin.getMessageManager().sendWithPrefix(player,
-                                "&a✔ &7Particula activada&8: &e" + particulaStr.toUpperCase());
+                                "&a✔ &7Particula activada&8: &e" +
+                                particulaStr.toUpperCase());
                             player.playSound(player.getLocation(),
                                 org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
                         } catch (Exception e) {
@@ -364,11 +363,15 @@ public class GUIListener implements Listener {
             org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
 
         plugin.getTrabajoManager().stopTrabajo(npc);
+
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             switch (modo) {
-                case "VIDA_PROPIA" -> plugin.getTrabajoManager().startCaminarNatural(npc);
-                case "GUARDAESPALDAS", "COMBATE", "POLICIA" ->
+                case "VIDA_PROPIA" ->
+                    plugin.getTrabajoManager().startCaminarNatural(npc);
+                case "GUARDAESPALDAS", "COMBATE" ->
                     plugin.getTrabajoManager().startTrabajo(npc);
+                case "ESTATICO", "DECORATIVO",
+                     "COMERCIANTE", "JEFE", "EVENTO" -> {}
             }
         }, 5L);
 
@@ -472,8 +475,6 @@ public class GUIListener implements Listener {
             case 31 -> {
                 plugin.getMessageManager().sendWithPrefix(player,
                     "&a✔ &7Construccion iniciada.");
-                plugin.getLogManager().log(npc.getId(),
-                    npc.getNombre() + " inicio construccion.");
                 new ConstruirGUI(plugin, npc).open(player);
             }
             case 32 -> {
