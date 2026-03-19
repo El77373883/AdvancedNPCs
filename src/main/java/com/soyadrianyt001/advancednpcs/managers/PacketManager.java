@@ -132,6 +132,7 @@ public class PacketManager {
                                        UUID uuid, int entityId,
                                        WrappedGameProfile gameProfile, Location loc) {
         try {
+            // 1) Agregar al tab list
             PacketContainer addInfo = protocolManager.createPacket(
                 PacketType.Play.Server.PLAYER_INFO);
             addInfo.getPlayerInfoActions().write(0,
@@ -143,30 +144,33 @@ public class PacketManager {
                 gameProfile,
                 WrappedChatComponent.fromText(npc.getNombre()),
                 (WrappedRemoteChatSessionData) null);
-            addInfo.getPlayerInfoDataLists().write(1,
+            // ✅ CORREGIDO: write(0) en lugar de write(1)
+            addInfo.getPlayerInfoDataLists().write(0,
                 Collections.singletonList(infoData));
             protocolManager.sendServerPacket(player, addInfo);
 
+            // 2) Spawnear entidad
             PacketContainer spawnPacket = protocolManager.createPacket(
                 PacketType.Play.Server.SPAWN_ENTITY);
             spawnPacket.getIntegers().write(0, entityId);
             spawnPacket.getUUIDs().write(0, uuid);
-            spawnPacket.getIntegers().write(1, 128);
-            spawnPacket.getIntegers().write(2, 0);
+            // ✅ CORREGIDO: EntityType en lugar de integer 128
+            spawnPacket.getEntityTypeModifier().write(0, org.bukkit.entity.EntityType.PLAYER);
             spawnPacket.getDoubles().write(0, loc.getX());
             spawnPacket.getDoubles().write(1, loc.getY());
             spawnPacket.getDoubles().write(2, loc.getZ());
             spawnPacket.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
             spawnPacket.getBytes().write(1, (byte)(loc.getPitch() * 256.0F / 360.0F));
-            // ✅ CORREGIDO: eliminado write(2,...) que causaba "Field index 2 is out of bounds"
             protocolManager.sendServerPacket(player, spawnPacket);
 
+            // 3) Rotacion de cabeza
             PacketContainer rotHead = protocolManager.createPacket(
                 PacketType.Play.Server.ENTITY_HEAD_ROTATION);
             rotHead.getIntegers().write(0, entityId);
             rotHead.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
             protocolManager.sendServerPacket(player, rotHead);
 
+            // 4) Metadata - mostrar skin completa
             WrappedDataWatcher watcher = new WrappedDataWatcher();
             WrappedDataWatcher.WrappedDataWatcherObject skinLayersObj =
                 new WrappedDataWatcher.WrappedDataWatcherObject(
@@ -175,10 +179,12 @@ public class PacketManager {
             PacketContainer metadata = protocolManager.createPacket(
                 PacketType.Play.Server.ENTITY_METADATA);
             metadata.getIntegers().write(0, entityId);
-            metadata.getWatchableCollectionModifier().write(0,
+            // ✅ CORREGIDO: getDataValueCollectionModifier para 1.21
+            metadata.getDataValueCollectionModifier().write(0,
                 watcher.getWatchableObjects());
             protocolManager.sendServerPacket(player, metadata);
 
+            // 5) Remover del tab list despues de 3 segundos
             new BukkitRunnable() {
                 @Override
                 public void run() {
@@ -482,4 +488,3 @@ public class PacketManager {
         return spawnedEntities.get(npcId);
     }
 }
-
