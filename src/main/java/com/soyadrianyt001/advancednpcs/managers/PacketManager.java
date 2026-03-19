@@ -83,23 +83,34 @@ public class PacketManager {
     private void spawnFancyNPC(NPCEntity npc, Location loc) {
         try {
             String fancyId = "advancednpc_" + npc.getId();
-            NpcData data = new NpcData(fancyId, npc.getSkin(), loc);
-            data.setDisplayName(plugin.getMessageManager().color(
-                "&b" + npc.getNombre()));
+            NpcData data = new NpcData(
+                fancyId,
+                UUID.randomUUID(),
+                npc.getNombre(),
+                loc
+            );
+            data.setSkin(new NpcData.NpcSkin(npc.getSkin(), false));
             data.setShowInTab(false);
-            data.setSpawnEntity(EntityType.PLAYER);
             data.setTurnToPlayer(true);
             data.setGlowing(false);
-            Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().create(data);
-            FancyNpcsPlugin.get().getNpcAdapter().register(fancyNpc);
+            Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().apply(data);
+            FancyNpcsPlugin.get().getNpcManager().addNpc(fancyNpc);
             fancyNpc.spawnForAll();
             npcFancyIds.put(npc.getId(), fancyId);
             saveNPCId(npc.getId(), fancyId);
             spawnHologram(npc, loc);
-            plugin.getLogger().info("NPC jugador creado con FancyNPCs: " + fancyId);
+            plugin.getLogger().info("NPC creado con FancyNPCs: " + fancyId);
         } catch (Exception e) {
             plugin.getLogger().warning("Error creando FancyNPC: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private Npc getFancyNpc(String fancyId) {
+        try {
+            return FancyNpcsPlugin.get().getNpcManager().getNpc(fancyId);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -241,10 +252,10 @@ public class PacketManager {
         String fancyId = npcFancyIds.remove(npc.getId());
         if (fancyId != null) {
             try {
-                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                Npc fancyNpc = getFancyNpc(fancyId);
                 if (fancyNpc != null) {
                     fancyNpc.removeForAll();
-                    FancyNpcsPlugin.get().getNpcAdapter().remove(fancyNpc);
+                    FancyNpcsPlugin.get().getNpcManager().removeNpc(fancyNpc);
                 }
             } catch (Exception e) {
                 plugin.getLogger().warning("Error removiendo FancyNPC: " + e.getMessage());
@@ -261,7 +272,7 @@ public class PacketManager {
         String fancyId = npcFancyIds.get(npc.getId());
         if (fancyId != null) {
             try {
-                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                Npc fancyNpc = getFancyNpc(fancyId);
                 if (fancyNpc != null) fancyNpc.removeForPlayer(player);
             } catch (Exception e) {
                 plugin.getLogger().warning("Error removiendo FancyNPC: " + e.getMessage());
@@ -273,10 +284,10 @@ public class PacketManager {
         plugin.getLogger().info("Eliminando todas las entidades de AdvancedNPCS...");
         for (String fancyId : new ArrayList<>(npcFancyIds.values())) {
             try {
-                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                Npc fancyNpc = getFancyNpc(fancyId);
                 if (fancyNpc != null) {
                     fancyNpc.removeForAll();
-                    FancyNpcsPlugin.get().getNpcAdapter().remove(fancyNpc);
+                    FancyNpcsPlugin.get().getNpcManager().removeNpc(fancyNpc);
                 }
             } catch (Exception e) {
                 plugin.getLogger().warning("Error removiendo FancyNPC: " + e.getMessage());
@@ -311,7 +322,7 @@ public class PacketManager {
             String fancyId = npcFancyIds.get(npc.getId());
             if (fancyId != null) {
                 try {
-                    Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                    Npc fancyNpc = getFancyNpc(fancyId);
                     if (fancyNpc != null) fancyNpc.spawnForPlayer(player);
                 } catch (Exception e) {
                     plugin.getLogger().warning("Error spawneando FancyNPC: " + e.getMessage());
@@ -330,7 +341,7 @@ public class PacketManager {
         String fancyId = npcFancyIds.get(npc.getId());
         if (fancyId != null) {
             try {
-                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                Npc fancyNpc = getFancyNpc(fancyId);
                 if (fancyNpc != null) {
                     fancyNpc.getData().setDisplayName(
                         plugin.getMessageManager().color("&b" + npc.getNombre()));
@@ -356,7 +367,7 @@ public class PacketManager {
         String fancyId = npcFancyIds.get(npc.getId());
         if (fancyId != null) {
             try {
-                Npc fancyNpc = FancyNpcsPlugin.get().getNpcAdapter().getNpc(fancyId);
+                Npc fancyNpc = getFancyNpc(fancyId);
                 if (fancyNpc != null) {
                     fancyNpc.getData().setLocation(newLoc);
                     fancyNpc.updateForAll();
