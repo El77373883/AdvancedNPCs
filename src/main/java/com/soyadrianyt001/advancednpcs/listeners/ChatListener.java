@@ -25,16 +25,29 @@ public class ChatListener implements Listener {
     public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
-        if (!pendingInputs.containsKey(uuid)) return;
-        event.setCancelled(true);
-        String message = event.getMessage();
-        Consumer<String> callback = pendingInputs.remove(uuid);
+
+        if (pendingInputs.containsKey(uuid)) {
+            event.setCancelled(true);
+            String message = event.getMessage();
+            Consumer<String> callback = pendingInputs.remove(uuid);
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                if (message.equalsIgnoreCase("cancel")) {
+                    plugin.getMessageManager().send(player, "cancelado");
+                    return;
+                }
+                callback.accept(message);
+            });
+            return;
+        }
+
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            if (message.equalsIgnoreCase("cancel")) {
-                plugin.getMessageManager().send(player, "cancelado");
-                return;
+            if (plugin.getDialogoManager().estaEnConversacion(player)) {
+                boolean procesado = plugin.getDialogoManager()
+                    .procesarMensaje(player, event.getMessage());
+                if (procesado) {
+                    event.setCancelled(true);
+                }
             }
-            callback.accept(message);
         });
     }
 
