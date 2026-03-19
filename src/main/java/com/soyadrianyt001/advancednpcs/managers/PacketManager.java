@@ -87,47 +87,26 @@ public class PacketManager {
         plugin.getLogger().info("Eliminadas " + count + " entidades antiguas.");
     }
 
-    public void spawnNPC(NPCEntity npc) {
-        Location loc = npc.getLocation();
-        if (loc == null || loc.getWorld() == null) return;
-        despawnNPC(npc);
-        String tipo = npc.getTipo().toUpperCase();
-        if (tipo.equals("PLAYER")) {
-            spawnPlayerNPC(npc, loc);
-        } else {
-            spawnMobNPC(npc, loc);
-        }
-    }
-
-    // ✅ CORREGIDO: agregar textura via reflexion para evitar NoSuchMethodError
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void addTextureToProfile(Object gameProfile, String skinUrl) {
         try {
             String base64 = Base64.getEncoder().encodeToString(
                 ("{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}").getBytes());
-
             Method getProperties = gameProfile.getClass().getMethod("getProperties");
             Object properties = getProperties.invoke(gameProfile);
-
-            // Crear Property via reflexion
             Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
             Object property;
             try {
-                // authlib nuevo: Property(String name, String value)
                 property = propertyClass
                     .getConstructor(String.class, String.class)
                     .newInstance("textures", base64);
             } catch (NoSuchMethodException e) {
-                // authlib viejo: Property(String name, String value, String signature)
                 property = propertyClass
                     .getConstructor(String.class, String.class, String.class)
                     .newInstance("textures", base64, "");
             }
-
-            // put en el multimap/propertymap
             Method put = properties.getClass().getMethod("put", Object.class, Object.class);
             put.invoke(properties, "textures", property);
-
         } catch (Exception e) {
             plugin.getLogger().warning("Error textura reflexion: " + e.getMessage());
         }
@@ -141,22 +120,18 @@ public class PacketManager {
             npcEntityIds.put(npc.getId(), entityId);
             String displayName = npc.getNombre().length() > 16
                 ? npc.getNombre().substring(0, 16) : npc.getNombre();
-
             WrappedGameProfile gameProfile = new WrappedGameProfile(uuid, displayName);
-
             if (profile != null) {
                 try {
                     org.bukkit.profile.PlayerTextures textures = profile.getTextures();
                     if (textures.getSkin() != null) {
                         String skinUrl = textures.getSkin().toString();
-                        // ✅ Usar reflexion en el handle NMS
                         addTextureToProfile(gameProfile.getHandle(), skinUrl);
                     }
                 } catch (Exception e) {
                     plugin.getLogger().warning("Error aplicando textura: " + e.getMessage());
                 }
             }
-
             for (org.bukkit.entity.Player player : loc.getWorld().getPlayers()) {
                 sendPlayerNPCPackets(npc, player, uuid, entityId, gameProfile, loc);
             }
@@ -211,44 +186,57 @@ public class PacketManager {
                 gameProfile,
                 WrappedChatComponent.fromText(npc.getNombre()),
                 (WrappedRemoteChatSessionData) null);
-            addInfo.getPlayerInfoDataLists().write(0,
+            // ✅ CORREGIDO: write(1, ...) no write(0, ...)
+            addInfo.getPlayerInfoDataLists().write(1,
                 Collections.singletonList(infoData));
             protocolManager.sendServerPacket(player, addInfo);
 
-            // 2) Spawnear entidad
-            PacketContainer spawnPacket = protocolManager.createPacket(
-                PacketType.Play.Server.SPAWN_ENTITY);
-            spawnPacket.getIntegers().write(0, entityId);
-            spawnPacket.getUUIDs().write(0, uuid);
-            spawnPacket.getEntityTypeModifier().write(0, org.bukkit.entity.EntityType.PLAYER);
-            spawnPacket.getDoubles().write(0, loc.getX());
-            spawnPacket.getDoubles().write(1, loc.getY());
-            spawnPacket.getDoubles().write(2, loc.getZ());
-            spawnPacket.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
-            spawnPacket.getBytes().write(1, (byte)(loc.getPitch() * 256.0F / 360.0F));
-            protocolManager.sendServerPacket(player, spawnPacket);
+            // 2) Spawnear entidad - esperar un tick para que el cliente procese el ADD_PLAYER
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                try {
+                    PacketContainer spawnPacket = protocolManager.createPacket(
+                        PacketType.Play.Server.SPAWN_ENTITY);
+                    spawnPacket.getIntegers().write(0, entityId);
+                    spawnPacket.getUUIDs().write(0, uuid);
+                    spawnPacket.getEntityTypeModifier().write(0,
+                        org.bukkit.entity.EntityType.PLAYER);
+                    spawnPacket.getDoubles().write(0, loc.getX());
+                    spawnPacket.getDoubles().write(1, loc.getY());
+                    spawnPacket.getDoubles().write(2, loc.getZ());
+                    spawnPacket.getBytes().write(0,
+                        (byte)(loc.getYaw() * 256.0F / 360.0F));
+                    spawnPacket.getBytes().write(1,
+                        (byte)(loc.getPitch() * 256.0F / 360.0F));
+                    protocolManager.sendServerPacket(player, spawnPacket);
 
-            // 3) Rotacion de cabeza
-            PacketContainer rotHead = protocolManager.createPacket(
-                PacketType.Play.Server.ENTITY_HEAD_ROTATION);
-            rotHead.getIntegers().write(0, entityId);
-            rotHead.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
-            protocolManager.sendServerPacket(player, rotHead);
+                    // 3) Rotacion cabeza
+                    PacketContainer rotHead = protocolManager.createPacket(
+                        PacketType.Play.Server.ENTITY_HEAD_ROTATION);
+                    rotHead.getIntegers().write(0, entityId);
+                    rotHead.getBytes().write(0,
+                        (byte)(loc.getYaw() * 256.0F / 360.0F));
+                    protocolManager.sendServerPacket(player, rotHead);
 
-            // 4) Metadata skin completa
-            List<WrappedDataValue> dataValues = new ArrayList<>();
-            dataValues.add(new WrappedDataValue(
-                17,
-                WrappedDataWatcher.Registry.get(Byte.class),
-                (byte) 127
-            ));
-            PacketContainer metadata = protocolManager.createPacket(
-                PacketType.Play.Server.ENTITY_METADATA);
-            metadata.getIntegers().write(0, entityId);
-            metadata.getDataValueCollectionModifier().write(0, dataValues);
-            protocolManager.sendServerPacket(player, metadata);
+                    // 4) Metadata con todas las capas de skin activadas
+                    List<WrappedDataValue> dataValues = new ArrayList<>();
+                    dataValues.add(new WrappedDataValue(
+                        17,
+                        WrappedDataWatcher.Registry.get(Byte.class),
+                        (byte) 127
+                    ));
+                    PacketContainer metadata = protocolManager.createPacket(
+                        PacketType.Play.Server.ENTITY_METADATA);
+                    metadata.getIntegers().write(0, entityId);
+                    metadata.getDataValueCollectionModifier().write(0, dataValues);
+                    protocolManager.sendServerPacket(player, metadata);
 
-            // 5) Remover del tab list despues de 3 segundos
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Error spawn NPC player: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }, 2L);
+
+            // 5) Remover del tab list despues de 5 segundos
             new BukkitRunnable() {
                 @Override
                 public void run() {
@@ -262,12 +250,24 @@ public class PacketManager {
                         plugin.getLogger().warning("Error removiendo info: " + e.getMessage());
                     }
                 }
-            }.runTaskLater(plugin, 60L);
+            }.runTaskLater(plugin, 100L);
 
         } catch (Exception e) {
             plugin.getLogger().warning("Error enviando packets NPC "
                 + npc.getId() + ": " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    public void spawnNPC(NPCEntity npc) {
+        Location loc = npc.getLocation();
+        if (loc == null || loc.getWorld() == null) return;
+        despawnNPC(npc);
+        String tipo = npc.getTipo().toUpperCase();
+        if (tipo.equals("PLAYER")) {
+            spawnPlayerNPC(npc, loc);
+        } else {
+            spawnMobNPC(npc, loc);
         }
     }
 
@@ -410,7 +410,7 @@ public class PacketManager {
     public void despawnNPC(NPCEntity npc) {
         Integer entityId = npcEntityIds.remove(npc.getId());
         UUID uuid = npcUUIDs.remove(npc.getId());
-        if (entityId != null && uuid != null) {
+        if (entityId != null) {
             for (org.bukkit.entity.Player player : plugin.getServer().getOnlinePlayers()) {
                 try {
                     PacketContainer destroy = protocolManager.createPacket(
@@ -418,7 +418,7 @@ public class PacketManager {
                     destroy.getIntLists().write(0, Collections.singletonList(entityId));
                     protocolManager.sendServerPacket(player, destroy);
                 } catch (Exception e) {
-                    plugin.getLogger().warning("Error destruyendo NPC packet: " + e.getMessage());
+                    plugin.getLogger().warning("Error destruyendo NPC: " + e.getMessage());
                 }
             }
         }
@@ -443,7 +443,8 @@ public class PacketManager {
         }
         Entity entity = spawnedEntities.get(npc.getId());
         if (entity != null && !entity.isDead()) {
-            entity.setMetadata("temp_hidden", new FixedMetadataValue(plugin, true));
+            entity.setMetadata("temp_hidden",
+                new FixedMetadataValue(plugin, true));
         }
     }
 
