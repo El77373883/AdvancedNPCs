@@ -8,9 +8,7 @@ import com.comphenix.protocol.wrappers.*;
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.entity.*;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -18,7 +16,6 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
@@ -87,28 +84,15 @@ public class PacketManager {
         plugin.getLogger().info("Eliminadas " + count + " entidades antiguas.");
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void addTextureToProfile(Object gameProfile, String skinUrl) {
+    private void addTextureToProfile(WrappedGameProfile gameProfile, String skinUrl) {
         try {
             String base64 = Base64.getEncoder().encodeToString(
                 ("{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}").getBytes());
-            Method getProperties = gameProfile.getClass().getMethod("getProperties");
-            Object properties = getProperties.invoke(gameProfile);
-            Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
-            Object property;
-            try {
-                property = propertyClass
-                    .getConstructor(String.class, String.class)
-                    .newInstance("textures", base64);
-            } catch (NoSuchMethodException e) {
-                property = propertyClass
-                    .getConstructor(String.class, String.class, String.class)
-                    .newInstance("textures", base64, "");
-            }
-            Method put = properties.getClass().getMethod("put", Object.class, Object.class);
-            put.invoke(properties, "textures", property);
+            gameProfile.getProperties().put("textures",
+                new WrappedSignedProperty("textures", base64, ""));
+            plugin.getLogger().info("Textura aplicada correctamente al NPC.");
         } catch (Exception e) {
-            plugin.getLogger().warning("Error textura reflexion: " + e.getMessage());
+            plugin.getLogger().warning("Error textura: " + e.getMessage());
         }
     }
 
@@ -125,11 +109,10 @@ public class PacketManager {
                 try {
                     org.bukkit.profile.PlayerTextures textures = profile.getTextures();
                     if (textures.getSkin() != null) {
-                        String skinUrl = textures.getSkin().toString();
-                        addTextureToProfile(gameProfile.getHandle(), skinUrl);
+                        addTextureToProfile(gameProfile, textures.getSkin().toString());
                     }
                 } catch (Exception e) {
-                    plugin.getLogger().warning("Error aplicando textura: " + e.getMessage());
+                    plugin.getLogger().warning("Error obteniendo textura: " + e.getMessage());
                 }
             }
             for (org.bukkit.entity.Player player : loc.getWorld().getPlayers()) {
@@ -176,7 +159,6 @@ public class PacketManager {
                                        UUID uuid, int entityId,
                                        WrappedGameProfile gameProfile, Location loc) {
         try {
-            // 1) Agregar al tab list
             PacketContainer addInfo = protocolManager.createPacket(
                 PacketType.Play.Server.PLAYER_INFO);
             setPlayerInfoActions(addInfo, "ADD_PLAYER", "UPDATE_LISTED");
@@ -186,12 +168,10 @@ public class PacketManager {
                 gameProfile,
                 WrappedChatComponent.fromText(npc.getNombre()),
                 (WrappedRemoteChatSessionData) null);
-            // ✅ CORREGIDO: write(1, ...) no write(0, ...)
             addInfo.getPlayerInfoDataLists().write(1,
                 Collections.singletonList(infoData));
             protocolManager.sendServerPacket(player, addInfo);
 
-            // 2) Spawnear entidad - esperar un tick para que el cliente procese el ADD_PLAYER
             plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
                 try {
                     PacketContainer spawnPacket = protocolManager.createPacket(
@@ -209,7 +189,6 @@ public class PacketManager {
                         (byte)(loc.getPitch() * 256.0F / 360.0F));
                     protocolManager.sendServerPacket(player, spawnPacket);
 
-                    // 3) Rotacion cabeza
                     PacketContainer rotHead = protocolManager.createPacket(
                         PacketType.Play.Server.ENTITY_HEAD_ROTATION);
                     rotHead.getIntegers().write(0, entityId);
@@ -217,7 +196,6 @@ public class PacketManager {
                         (byte)(loc.getYaw() * 256.0F / 360.0F));
                     protocolManager.sendServerPacket(player, rotHead);
 
-                    // 4) Metadata con todas las capas de skin activadas
                     List<WrappedDataValue> dataValues = new ArrayList<>();
                     dataValues.add(new WrappedDataValue(
                         17,
@@ -236,7 +214,6 @@ public class PacketManager {
                 }
             }, 2L);
 
-            // 5) Remover del tab list despues de 5 segundos
             new BukkitRunnable() {
                 @Override
                 public void run() {
