@@ -5,6 +5,8 @@ import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.ProtocolManager;
 import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.wrappers.*;
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.Property;
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Location;
@@ -104,7 +106,9 @@ public class PacketManager {
             npcEntityIds.put(npc.getId(), entityId);
             String displayName = npc.getNombre().length() > 16
                 ? npc.getNombre().substring(0, 16) : npc.getNombre();
-            WrappedGameProfile gameProfile = new WrappedGameProfile(uuid, displayName);
+
+            // ✅ CORREGIDO: usar NMS GameProfile directamente para evitar GET_PROPERTIES null
+            GameProfile nmsProfile = new GameProfile(uuid, displayName);
             if (profile != null) {
                 try {
                     org.bukkit.profile.PlayerTextures textures = profile.getTextures();
@@ -112,13 +116,15 @@ public class PacketManager {
                         String skinUrl = textures.getSkin().toString();
                         String base64 = Base64.getEncoder().encodeToString(
                             ("{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}").getBytes());
-                        gameProfile.getProperties().put("textures",
-                            new WrappedSignedProperty("textures", base64, ""));
+                        nmsProfile.getProperties().put("textures",
+                            new Property("textures", base64, ""));
                     }
                 } catch (Exception e) {
                     plugin.getLogger().warning("Error aplicando textura: " + e.getMessage());
                 }
             }
+            WrappedGameProfile gameProfile = WrappedGameProfile.fromHandle(nmsProfile);
+
             for (org.bukkit.entity.Player player : loc.getWorld().getPlayers()) {
                 sendPlayerNPCPackets(npc, player, uuid, entityId, gameProfile, loc);
             }
@@ -168,7 +174,7 @@ public class PacketManager {
             rotHead.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
             protocolManager.sendServerPacket(player, rotHead);
 
-            // 4) Metadata - ✅ CORREGIDO para 1.21
+            // 4) Metadata para mostrar skin completa
             List<WrappedDataValue> dataValues = new ArrayList<>();
             dataValues.add(new WrappedDataValue(
                 17,
@@ -417,7 +423,8 @@ public class PacketManager {
             if (uuid != null && entityId != null) {
                 String displayName = npc.getNombre().length() > 16
                     ? npc.getNombre().substring(0, 16) : npc.getNombre();
-                WrappedGameProfile gameProfile = new WrappedGameProfile(uuid, displayName);
+                GameProfile nmsProfile = new GameProfile(uuid, displayName);
+                WrappedGameProfile gameProfile = WrappedGameProfile.fromHandle(nmsProfile);
                 sendPlayerNPCPackets(npc, player, uuid, entityId, gameProfile, loc);
             } else {
                 spawnPlayerNPC(npc, loc);
