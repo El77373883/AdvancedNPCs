@@ -4,7 +4,6 @@ import com.soyadrianyt001.advancednpcs.commands.AnpcCommand;
 import com.soyadrianyt001.advancednpcs.commands.QuestCommand;
 import com.soyadrianyt001.advancednpcs.commands.RepCommand;
 import com.soyadrianyt001.advancednpcs.managers.*;
-import com.soyadrianyt001.advancednpcs.listeners.*;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -25,8 +24,10 @@ public class AdvancedNPCS extends JavaPlugin {
     private MisionManager misionManager;
     private LogManager logManager;
     private VersionChecker versionChecker;
-    private PartikulasManager partic ulasManager;
+    private PartikulasManager particulasManager;
     private ClimatiManager climatiManager;
+    private ConfirmCallbacks confirmCallbacks;
+    private ListenerManager listenerManager;
 
     @Override
     public void onEnable() {
@@ -41,7 +42,6 @@ public class AdvancedNPCS extends JavaPlugin {
         }
         initManagers();
         registerCommands();
-        registerListeners();
         versionChecker.check();
         getLogger().info("AdvancedNPCS Premium cargado correctamente.");
     }
@@ -56,7 +56,7 @@ public class AdvancedNPCS extends JavaPlugin {
     private void printStartupMessage() {
         Bukkit.getConsoleSender().sendMessage("§8╔══════════════════════════════════════════╗");
         Bukkit.getConsoleSender().sendMessage("§8║  §b§l  Advanced§3§lNPCS §8- §d§lPremium Edition        ║");
-        Bukkit.getConsoleSender().sendMessage("§8║  §7Versión §e1.0.0 §7| §7Paper §e1.21.1              ║");
+        Bukkit.getConsoleSender().sendMessage("§8║  §7Version §e1.0.0 §7| §7Paper §e1.21.1              ║");
         Bukkit.getConsoleSender().sendMessage("§8║  §7Autor§8: §bsoyadrianyt001                    ║");
         Bukkit.getConsoleSender().sendMessage("§8║  §7Estado§8: §a✔ Plugin cargado correctamente   ║");
         Bukkit.getConsoleSender().sendMessage("§8║  §5✦ §dGracias por usar AdvancedNPCS Premium §5✦  ║");
@@ -84,6 +84,7 @@ public class AdvancedNPCS extends JavaPlugin {
         messageManager = new MessageManager(this);
         logManager = new LogManager(this);
         packetManager = new PacketManager(this);
+        confirmCallbacks = new ConfirmCallbacks(this);
         npcManager = new NPCManager(this);
         trabajoManager = new TrabajoManager(this);
         familiaManager = new FamiliaManager(this);
@@ -93,20 +94,13 @@ public class AdvancedNPCS extends JavaPlugin {
         particulasManager = new PartikulasManager(this);
         climatiManager = new ClimatiManager(this);
         versionChecker = new VersionChecker(this);
+        listenerManager = new ListenerManager(this);
     }
 
     private void registerCommands() {
         getCommand("anpc").setExecutor(new AnpcCommand(this));
         getCommand("quest").setExecutor(new QuestCommand(this));
         getCommand("rep").setExecutor(new RepCommand(this));
-    }
-
-    private void registerListeners() {
-        getServer().getPluginManager().registerEvents(new NPCListener(this), this);
-        getServer().getPluginManager().registerEvents(new GUIListener(this), this);
-        getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
-        getServer().getPluginManager().registerEvents(new ChatListener(this), this);
-        getServer().getPluginManager().registerEvents(new CombateListener(this), this);
     }
 
     public static AdvancedNPCS getInstance() { return instance; }
@@ -124,4 +118,6 @@ public class AdvancedNPCS extends JavaPlugin {
     public VersionChecker getVersionChecker() { return versionChecker; }
     public PartikulasManager getParticulasManager() { return particulasManager; }
     public ClimatiManager getClimatiManager() { return climatiManager; }
+    public ConfirmCallbacks getConfirmCallbacks() { return confirmCallbacks; }
+    public ListenerManager getListeners() { return listenerManager; }
 }
