@@ -182,6 +182,38 @@ public class GUIListener implements Listener {
                         new ConfigGUI(plugin, npc).open(player);
                     });
             }
+            case 16 -> {
+                player.closeInventory();
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&7Escribe el tipo de particula&8:");
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&7Tipos&8: &eHEART&7, &eCRIT&7, &eSNOWFLAKE&7, &eWITCH&7, &eFLAME&7, &eCLOUD");
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&7Modo&8: &eNORMAL&7, &eAURA&7, &eCORONA&7, &eRASTRO");
+                plugin.getMessageManager().sendWithPrefix(player,
+                    "&7Ejemplo&8: &eHEART:AURA &7o &eFLAME:CORONA");
+                plugin.getListeners().getChatListener().awaitInput(player,
+                    "&7Escribe la particula:", particulaStr -> {
+                        try {
+                            String[] parts = particulaStr.split(":");
+                            org.bukkit.Particle.valueOf(parts[0].toUpperCase());
+                            npc.getParticulas().clear();
+                            npc.getParticulas().add(particulaStr.toUpperCase());
+                            npc.saveToConfig();
+                            plugin.getParticulasManager().stopParticles(npc);
+                            plugin.getParticulasManager().startParticles(npc);
+                            plugin.getMessageManager().sendWithPrefix(player,
+                                "&a✔ &7Particula activada&8: &e" +
+                                particulaStr.toUpperCase());
+                            player.playSound(player.getLocation(),
+                                org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
+                        } catch (Exception e) {
+                            plugin.getMessageManager().sendWithPrefix(player,
+                                "&cParticula invalida. Usa nombres como HEART, CRIT, FLAME");
+                        }
+                        new ConfigGUI(plugin, npc).open(player);
+                    });
+            }
             case 20 -> {
                 player.closeInventory();
                 plugin.getMessageManager().sendWithPrefix(player,
@@ -216,7 +248,8 @@ public class GUIListener implements Listener {
                 npc.setTiendaActiva(!npc.isTiendaActiva());
                 npc.saveToConfig();
                 plugin.getMessageManager().sendWithPrefix(player,
-                    "&a✔ &7Tienda " + (npc.isTiendaActiva() ? "&aACTIVADA" : "&cDESACTIVADA"));
+                    "&a✔ &7Tienda " +
+                    (npc.isTiendaActiva() ? "&aACTIVADA" : "&cDESACTIVADA"));
                 new ConfigGUI(plugin, npc).open(player);
             }
             case 31 -> new ConstruirGUI(plugin, npc).open(player);
@@ -261,7 +294,8 @@ public class GUIListener implements Listener {
             npc.setDormirActivo(!npc.isDormirActivo());
             npc.saveToConfig();
             plugin.getMessageManager().sendWithPrefix(player,
-                "&7Dormir&8: " + (npc.isDormirActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
+                "&7Dormir&8: " +
+                (npc.isDormirActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
             new ProfesionGUI(plugin, npc).open(player);
             return;
         }
@@ -269,7 +303,8 @@ public class GUIListener implements Listener {
             npc.setComerActivo(!npc.isComerActivo());
             npc.saveToConfig();
             plugin.getMessageManager().sendWithPrefix(player,
-                "&7Comer&8: " + (npc.isComerActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
+                "&7Comer&8: " +
+                (npc.isComerActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
             new ProfesionGUI(plugin, npc).open(player);
             return;
         }
@@ -277,7 +312,9 @@ public class GUIListener implements Listener {
             npc.setCaminarActivo(!npc.isCaminarActivo());
             npc.saveToConfig();
             plugin.getMessageManager().sendWithPrefix(player,
-                "&7Caminar&8: " + (npc.isCaminarActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
+                "&7Caminar&8: " +
+                (npc.isCaminarActivo() ? "&aACTIVADO" : "&cDESACTIVADO"));
+            plugin.getTrabajoManager().startTrabajo(npc);
             new ProfesionGUI(plugin, npc).open(player);
             return;
         }
@@ -322,6 +359,13 @@ public class GUIListener implements Listener {
             "&a✔ &7Modo cambiado a &b" + modo);
         player.playSound(player.getLocation(),
             org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
+
+        if (modo.equals("VIDA_PROPIA")) {
+            plugin.getTrabajoManager().startCaminarNatural(npc);
+        } else if (modo.equals("GUARDAESPALDAS") || modo.equals("COMBATE")) {
+            plugin.getTrabajoManager().startTrabajo(npc);
+        }
+
         new ConfigGUI(plugin, npc).open(player);
     }
 
@@ -395,7 +439,8 @@ public class GUIListener implements Listener {
                         "&7Skin del hijo&8:", skin -> {
                             NPCEntity esposa = plugin.getNPCManager()
                                 .getNPC(npcFinal.getFamiliaEsposaId());
-                            plugin.getFamiliaManager().crearHijo(npcFinal, esposa, nombre, skin);
+                            plugin.getFamiliaManager().crearHijo(
+                                npcFinal, esposa, nombre, skin);
                             plugin.getMessageManager().sendWithPrefix(player,
                                 "&e✦ &7Hijo creado&8: &e" + nombre);
                             new InteraccionFamiliaGUI(plugin, npcFinal).open(player);
@@ -532,7 +577,8 @@ public class GUIListener implements Listener {
             String stripped = ChatColor.stripColor(lore);
             if (stripped.startsWith("Precio: $")) {
                 try {
-                    return Double.parseDouble(stripped.replace("Precio: $", "").trim());
+                    return Double.parseDouble(
+                        stripped.replace("Precio: $", "").trim());
                 } catch (Exception ignored) {}
             }
         }
