@@ -158,7 +158,7 @@ public class PacketManager {
             spawnPacket.getDoubles().write(2, loc.getZ());
             spawnPacket.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
             spawnPacket.getBytes().write(1, (byte)(loc.getPitch() * 256.0F / 360.0F));
-            spawnPacket.getBytes().write(2, (byte)(loc.getYaw() * 256.0F / 360.0F));
+            // ✅ CORREGIDO: eliminado write(2,...) que causaba "Field index 2 is out of bounds"
             protocolManager.sendServerPacket(player, spawnPacket);
 
             PacketContainer rotHead = protocolManager.createPacket(
@@ -482,3 +482,4 @@ public class PacketManager {
         return spawnedEntities.get(npcId);
     }
 }
+
