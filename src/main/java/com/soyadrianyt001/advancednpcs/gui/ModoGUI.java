@@ -5,8 +5,11 @@ import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import java.util.Arrays;
@@ -87,7 +90,9 @@ public class ModoGUI {
         lore.add(color("&7" + desc));
         lore.add(color(" "));
         lore.add(color("&e&lFUNCIONES&8:"));
-        for (int i = 0; i < funciones.length - 1; i++) lore.add(color(funciones[i]));
+        for (int i = 0; i < funciones.length - 1; i++) {
+            lore.add(color(funciones[i]));
+        }
         lore.add(color(" "));
         lore.add(color(funciones[funciones.length - 1]));
         lore.add(color(" "));
@@ -95,8 +100,8 @@ public class ModoGUI {
         lore.add(color(activo ? "&a✔ ACTIVO - Click para cambiar" : "&7Click para elegir este modo"));
         lore.add(color("&8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"));
         if (activo) {
-            meta.addEnchant(org.bukkit.enchantments.Enchantment.LUCK, 1, true);
-            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+            meta.addEnchant(Enchantment.getByKey(NamespacedKey.minecraft("unbreaking")), 1, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         }
         meta.setLore(lore);
         item.setItemMeta(meta);
