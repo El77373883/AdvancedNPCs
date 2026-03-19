@@ -19,6 +19,8 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.scheduler.BukkitRunnable;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
 public class PacketManager {
@@ -107,7 +109,6 @@ public class PacketManager {
             String displayName = npc.getNombre().length() > 16
                 ? npc.getNombre().substring(0, 16) : npc.getNombre();
 
-            // ✅ Usar NMS GameProfile directamente
             GameProfile nmsProfile = new GameProfile(uuid, displayName);
             if (profile != null) {
                 try {
@@ -134,6 +135,38 @@ public class PacketManager {
         });
     }
 
+    // ✅ CORREGIDO: fix del ClassCastException ArrayList->EnumSet en ProtocolLib con 1.21.1
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void setPlayerInfoActions(PacketContainer packet, String... actionNames) {
+        try {
+            Object nmsPacket = packet.getHandle();
+            for (Field field : nmsPacket.getClass().getDeclaredFields()) {
+                if (field.getType() == EnumSet.class) {
+                    field.setAccessible(true);
+                    Class<?> enumType = null;
+                    if (field.getGenericType() instanceof ParameterizedType pt) {
+                        enumType = (Class<?>) pt.getActualTypeArguments()[0];
+                    }
+                    if (enumType != null && enumType.isEnum()) {
+                        EnumSet nmsActions = EnumSet.noneOf((Class<Enum>) enumType);
+                        for (Object constant : enumType.getEnumConstants()) {
+                            String name = ((Enum<?>) constant).name();
+                            for (String actionName : actionNames) {
+                                if (name.equals(actionName)) {
+                                    nmsActions.add((Enum) constant);
+                                }
+                            }
+                        }
+                        field.set(nmsPacket, nmsActions);
+                    }
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Error seteando actions: " + e.getMessage());
+        }
+    }
+
     private void sendPlayerNPCPackets(NPCEntity npc, org.bukkit.entity.Player player,
                                        UUID uuid, int entityId,
                                        WrappedGameProfile gameProfile, Location loc) {
@@ -141,9 +174,10 @@ public class PacketManager {
             // 1) Agregar al tab list
             PacketContainer addInfo = protocolManager.createPacket(
                 PacketType.Play.Server.PLAYER_INFO);
-            addInfo.getPlayerInfoActions().write(0,
-                EnumSet.of(EnumWrappers.PlayerInfoAction.ADD_PLAYER,
-                           EnumWrappers.PlayerInfoAction.UPDATE_LISTED));
+
+            // ✅ CORREGIDO: usar NMS directo para evitar ClassCastException
+            setPlayerInfoActions(addInfo, "ADD_PLAYER", "UPDATE_LISTED");
+
             PlayerInfoData infoData = new PlayerInfoData(
                 uuid, 0, false,
                 EnumWrappers.NativeGameMode.SURVIVAL,
