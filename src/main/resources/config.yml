@@ -1,0 +1,51 @@
+# ╔══════════════════════════════════════╗
+# ║   AdvancedNPCS Premium               ║
+# ║   Creado por soyadrianyt001          ║
+# ║   Version: 1.0.0                     ║
+# ╚══════════════════════════════════════╝
+
+prefix: "&8[&b&lAdvancedNPCS &5✦ &d&lPremium&8]"
+
+version_checker:
+  activado: true
+  url: "https://raw.githubusercontent.com/soyadrianyt001/AdvancedNPCS/main/version.txt"
+  intervalo_minutos: 30
+  avisar_al_admin_al_entrar: true
+
+particulas:
+  activadas: true
+  rango_render: 20
+  max_por_npc: 3
+
+nametag:
+  activado: true
+  mostrar_vida: true
+  mostrar_barra: true
+  mostrar_relacion: true
+  rango_visible: 20
+
+movimiento_natural:
+  activado: true
+  zona_radio: 10
+  velocidad: 0.2
+  pausa_min_segundos: 3
+  pausa_max_segundos: 8
+
+sueno:
+  hora_dormir: 13000
+  hora_despertar: 23000
+  buscar_cama_cercana: true
+  rango_busqueda_cama: 20
+
+banco:
+  interes:
+    activado: true
+    porcentaje: 2
+    intervalo_horas: 24
+  limite_deposito: 1000000
+
+policia:
+  niveles_busqueda: 5
+  tiempo_reduccion_segundos: 300
+
+npcs_registrados: []
