@@ -7,7 +7,6 @@ import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.wrappers.*;
 import com.soyadrianyt001.advancednpcs.AdvancedNPCS;
 import com.soyadrianyt001.advancednpcs.npc.NPCEntity;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -50,21 +49,30 @@ public class PacketManager {
         int entityId = npcEntityIds.computeIfAbsent(npc.getId(), k -> entityIdCounter++);
 
         try {
-            WrappedGameProfile profile = new WrappedGameProfile(uuid, npc.getNombre().length() > 16
-                ? npc.getNombre().substring(0, 16) : npc.getNombre());
+            String displayName = npc.getNombre().length() > 16
+                ? npc.getNombre().substring(0, 16) : npc.getNombre();
+            WrappedGameProfile profile = new WrappedGameProfile(uuid, displayName);
 
             PacketContainer addPlayer = protocolManager.createPacket(PacketType.Play.Server.PLAYER_INFO);
             addPlayer.getPlayerInfoActions().write(0,
-                EnumSet.of(PlayerInfoAction.ADD_PLAYER, PlayerInfoAction.UPDATE_LISTED));
-            List<PlayerInfoData> playerInfoData = new ArrayList<>();
-            playerInfoData.add(new PlayerInfoData(
-                uuid, 0, false,
+                EnumSet.of(EnumWrappers.PlayerInfoAction.ADD_PLAYER,
+                           EnumWrappers.PlayerInfoAction.UPDATE_LISTED));
+
+            PlayerInfoData playerInfoData = new PlayerInfoData(
+                uuid,
+                0,
+                false,
                 EnumWrappers.NativeGameMode.SURVIVAL,
-                profile, null, null));
-            addPlayer.getPlayerInfoDataLists().write(1, playerInfoData);
+                profile,
+                null
+            );
+
+            addPlayer.getPlayerInfoDataLists().write(1,
+                Collections.singletonList(playerInfoData));
             protocolManager.sendServerPacket(player, addPlayer);
 
-            PacketContainer spawnPacket = protocolManager.createPacket(PacketType.Play.Server.NAMED_ENTITY_SPAWN);
+            PacketContainer spawnPacket = protocolManager.createPacket(
+                PacketType.Play.Server.NAMED_ENTITY_SPAWN);
             spawnPacket.getIntegers().write(0, entityId);
             spawnPacket.getUUIDs().write(0, uuid);
             spawnPacket.getDoubles().write(0, loc.getX());
@@ -74,7 +82,8 @@ public class PacketManager {
             spawnPacket.getBytes().write(1, (byte)(loc.getPitch() * 256.0F / 360.0F));
             protocolManager.sendServerPacket(player, spawnPacket);
 
-            PacketContainer rotHead = protocolManager.createPacket(PacketType.Play.Server.ENTITY_HEAD_ROTATION);
+            PacketContainer rotHead = protocolManager.createPacket(
+                PacketType.Play.Server.ENTITY_HEAD_ROTATION);
             rotHead.getIntegers().write(0, entityId);
             rotHead.getBytes().write(0, (byte)(loc.getYaw() * 256.0F / 360.0F));
             protocolManager.sendServerPacket(player, rotHead);
@@ -83,16 +92,16 @@ public class PacketManager {
                 @Override
                 public void run() {
                     try {
-                        PacketContainer removeInfo = protocolManager.createPacket(PacketType.Play.Server.PLAYER_INFO_REMOVE);
-                        removeInfo.getUUIDLists().write(0, Collections.singletonList(uuid));
+                        PacketContainer removeInfo = protocolManager.createPacket(
+                            PacketType.Play.Server.PLAYER_INFO_REMOVE);
+                        removeInfo.getUUIDLists().write(0,
+                            Collections.singletonList(uuid));
                         protocolManager.sendServerPacket(player, removeInfo);
                     } catch (Exception e) {
-                        plugin.getLogger().warning("Error removiendo info del NPC: " + e.getMessage());
+                        plugin.getLogger().warning("Error removiendo info NPC: " + e.getMessage());
                     }
                 }
             }.runTaskLater(plugin, 20L);
-
-            updateNameTagForPlayer(npc, player);
 
         } catch (Exception e) {
             plugin.getLogger().warning("Error spawneando NPC " + npc.getId() + ": " + e.getMessage());
@@ -111,8 +120,10 @@ public class PacketManager {
         Integer entityId = npcEntityIds.get(npc.getId());
         if (entityId == null) return;
         try {
-            PacketContainer destroyPacket = protocolManager.createPacket(PacketType.Play.Server.ENTITY_DESTROY);
-            destroyPacket.getIntLists().write(0, Collections.singletonList(entityId));
+            PacketContainer destroyPacket = protocolManager.createPacket(
+                PacketType.Play.Server.ENTITY_DESTROY);
+            destroyPacket.getIntLists().write(0,
+                Collections.singletonList(entityId));
             protocolManager.sendServerPacket(player, destroyPacket);
         } catch (Exception e) {
             plugin.getLogger().warning("Error despawneando NPC " + npc.getId() + ": " + e.getMessage());
@@ -136,32 +147,19 @@ public class PacketManager {
             barra.append(i < barraLlena ? "■" : "&7■");
         }
         barra.append(colorVida + "]");
-
         String relacionInfo = "";
         if (npc.getFamiliaEsposaId() != -1) {
             NPCEntity esposa = plugin.getNPCManager().getNPC(npc.getFamiliaEsposaId());
-            if (esposa != null) relacionInfo = "\n&d❤ &7Pareja de &d" + esposa.getNombre();
+            if (esposa != null) relacionInfo = " &d❤ &7Pareja de &d" + esposa.getNombre();
         }
         if (npc.isEsHijo()) {
-            relacionInfo = "\n&e👶 &7Hijo de familia";
+            relacionInfo = " &e👶 &7Hijo de familia";
         }
-
         String nameTag = plugin.getMessageManager().color(
-            "&b" + npc.getNombre() + "\n" +
-            colorVida + "❤ &f" + (int)npc.getVidaActual() + "&8/&f" + (int)npc.getVidaMaxima() + "\n" +
-            barra + relacionInfo + "\n" +
-            "&5✦ &7Creado por &bsoyadrianyt001");
-
-        Integer entityId = npcEntityIds.get(npc.getId());
-        if (entityId == null) return;
-
-        try {
-            PacketContainer metadata = protocolManager.createPacket(PacketType.Play.Server.ENTITY_METADATA);
-            metadata.getIntegers().write(0, entityId);
-            player.sendMessage(plugin.getMessageManager().color(nameTag));
-        } catch (Exception e) {
-            plugin.getLogger().warning("Error actualizando nametag NPC " + npc.getId());
-        }
+            "&b" + npc.getNombre() + " " +
+            colorVida + "❤ &f" + (int)npc.getVidaActual() + "&8/&f" + (int)npc.getVidaMaxima() + " " +
+            barra + relacionInfo + " &5✦ &7Creado por &bsoyadrianyt001");
+        player.sendMessage(nameTag);
     }
 
     public void moveNPC(NPCEntity npc, Location newLoc) {
