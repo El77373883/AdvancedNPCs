@@ -78,31 +78,35 @@ public class TrabajoManager {
         if (distancia < 0.3) return;
 
         double velocidad = 0.15;
-        int pasos = Math.max(1, (int)(distancia / velocidad));
-        pasos = Math.min(pasos, 80);
+        int totalPasos = Math.max(1, Math.min((int)(distancia / velocidad), 80));
 
-        double dx = (destino.getX() - inicio.getX()) / pasos;
-        double dy = (destino.getY() - inicio.getY()) / pasos;
-        double dz = (destino.getZ() - inicio.getZ()) / pasos;
-
-        double yaw = Math.toDegrees(Math.atan2(
+        final double dx = (destino.getX() - inicio.getX()) / totalPasos;
+        final double dy = (destino.getY() - inicio.getY()) / totalPasos;
+        final double dz = (destino.getZ() - inicio.getZ()) / totalPasos;
+        final double startX = inicio.getX();
+        final double startY = inicio.getY();
+        final double startZ = inicio.getZ();
+        final float yaw = (float)(Math.toDegrees(Math.atan2(
             destino.getZ() - inicio.getZ(),
-            destino.getX() - inicio.getX())) - 90;
-
+            destino.getX() - inicio.getX())) - 90);
         final int[] step = {0};
-        final Location current = inicio.clone();
+        final Location destinoFinal = destino.clone();
 
         BukkitTask moveTask = plugin.getServer().getScheduler()
             .runTaskTimer(plugin, () -> {
-                if (step[0] >= pasos) {
+                if (step[0] >= totalPasos) {
                     moveTasks.remove(npc.getId());
-                    moverFancyNPC(npc, destino.clone());
-                    npc.setLocation(destino.clone());
+                    moverFancyNPC(npc, destinoFinal);
+                    npc.setLocation(destinoFinal.clone());
                     return;
                 }
-                current.add(dx, dy, dz);
-                current.setYaw((float) yaw);
-                moverFancyNPC(npc, current.clone());
+                Location pasoLoc = new Location(
+                    destinoFinal.getWorld(),
+                    startX + dx * step[0],
+                    startY + dy * step[0],
+                    startZ + dz * step[0],
+                    yaw, 0);
+                moverFancyNPC(npc, pasoLoc);
                 step[0]++;
             }, 0L, 1L);
 
@@ -170,13 +174,18 @@ public class TrabajoManager {
                         for (int z = -radio; z <= radio; z++) {
                             Block block = loc.clone().add(x, y, z).getBlock();
                             if (isMineral(block.getType())) {
+                                final Block blockFinal = block;
                                 moverSuave(npc,
                                     block.getLocation().clone().add(0.5, 0, 0.5));
                                 plugin.getServer().getScheduler()
                                     .runTaskLater(plugin, () -> {
-                                        Material tipo = block.getType();
-                                        block.setType(Material.AIR);
-                                        spawnParticulas(npc, block.getLocation());
+                                        Material tipo = blockFinal.getType();
+                                        blockFinal.setType(Material.AIR);
+                                        spawnParticulas(npc,
+                                            blockFinal.getLocation());
+                                        plugin.getLogManager().log(npc.getId(),
+                                            npc.getNombre() + " mino " +
+                                            tipo.name());
                                         sendFrase(npc, Arrays.asList(
                                             "Encontre un mineral!",
                                             "Minando...",
@@ -205,12 +214,14 @@ public class TrabajoManager {
                         for (int z = -8; z <= 8; z++) {
                             Block block = loc.clone().add(x, y, z).getBlock();
                             if (isTronco(block.getType())) {
+                                final Block blockFinal = block;
                                 moverSuave(npc,
                                     block.getLocation().clone().add(0.5, 0, 0.5));
                                 plugin.getServer().getScheduler()
                                     .runTaskLater(plugin, () -> {
-                                        block.setType(Material.AIR);
-                                        spawnParticulas(npc, block.getLocation());
+                                        blockFinal.setType(Material.AIR);
+                                        spawnParticulas(npc,
+                                            blockFinal.getLocation());
                                         sendFrase(npc, Arrays.asList(
                                             "Cortando arbol!",
                                             "Madera lista."));
@@ -237,19 +248,25 @@ public class TrabajoManager {
                         if (block.getType() == Material.WHEAT) {
                             try {
                                 org.bukkit.block.data.Ageable ageable =
-                                    (org.bukkit.block.data.Ageable) block.getBlockData();
-                                if (ageable.getAge() == ageable.getMaximumAge()) {
+                                    (org.bukkit.block.data.Ageable)
+                                    block.getBlockData();
+                                if (ageable.getAge() ==
+                                    ageable.getMaximumAge()) {
+                                    final Block blockFinal = block;
                                     moverSuave(npc,
-                                        block.getLocation().clone().add(0.5, 0, 0.5));
+                                        block.getLocation().clone()
+                                        .add(0.5, 0, 0.5));
                                     plugin.getServer().getScheduler()
                                         .runTaskLater(plugin, () -> {
-                                            block.setType(Material.AIR);
-                                            if (block.getRelative(0, -1, 0)
+                                            blockFinal.setType(Material.AIR);
+                                            if (blockFinal.getRelative(0, -1, 0)
                                                 .getType() == Material.FARMLAND)
-                                                block.setType(Material.WHEAT);
-                                            spawnParticulas(npc, block.getLocation());
+                                                blockFinal.setType(Material.WHEAT);
+                                            spawnParticulas(npc,
+                                                blockFinal.getLocation());
                                             sendFrase(npc, Arrays.asList(
-                                                "Cosechando!", "Buena cosecha!"));
+                                                "Cosechando!",
+                                                "Buena cosecha!"));
                                         }, 15L);
                                     return;
                                 }
@@ -277,11 +294,14 @@ public class TrabajoManager {
                 if (aguaCerca) {
                     spawnParticulas(npc, loc);
                     sendFrase(npc, Arrays.asList(
-                        "Pescando...", "Esperando que piquen...", "Pique!"));
+                        "Pescando...",
+                        "Esperando que piquen...",
+                        "Pique!"));
                 } else {
                     if (npc.isCaminarActivo()) wanderAround(npc, 5);
                     sendFrase(npc, Arrays.asList(
-                        "Buscando agua...", "Necesito un lago..."));
+                        "Buscando agua...",
+                        "Necesito un lago..."));
                 }
             }, 0L, 200L);
         trabajoTasks.put(npc.getId(), task);
@@ -301,12 +321,14 @@ public class TrabajoManager {
                         moverSuave(npc, a.getLocation());
                         sendFrase(npc, Arrays.asList(
                             "Cuidando animales...",
-                            "Alimentando el rebano..."));
+                            "Alimentando el rebano...",
+                            "Ven aqui, bichito!"));
                         encontro = true;
                         break;
                     }
                 }
-                if (!encontro && npc.isCaminarActivo()) wanderAround(npc, 5);
+                if (!encontro && npc.isCaminarActivo())
+                    wanderAround(npc, 5);
             }, 0L, 150L);
         trabajoTasks.put(npc.getId(), task);
     }
@@ -351,7 +373,8 @@ public class TrabajoManager {
                             moverSuave(npc, e.getLocation().clone());
                             sendFrase(npc, Arrays.asList(
                                 "Protegiendo al jugador!",
-                                "Atras, monstruo!"));
+                                "Atras, monstruo!",
+                                "No te acerques!"));
                             break;
                         }
                     }
@@ -365,16 +388,17 @@ public class TrabajoManager {
     private void startPatrulla(NPCEntity npc) {
         Location baseLocation = getSpawnLocation(npc);
         if (baseLocation == null) return;
+        final Location baseFinal = baseLocation.clone();
         BukkitTask task = plugin.getServer().getScheduler()
             .runTaskTimer(plugin, () -> {
                 Location loc = npc.getLocation();
                 if (loc == null || loc.getWorld() == null) return;
                 double angle =
                     (System.currentTimeMillis() / 3000.0) % (2 * Math.PI);
-                double nx = baseLocation.getX() + 8 * Math.cos(angle);
-                double nz = baseLocation.getZ() + 8 * Math.sin(angle);
+                double nx = baseFinal.getX() + 8 * Math.cos(angle);
+                double nz = baseFinal.getZ() + 8 * Math.sin(angle);
                 Location patrullaLoc = new Location(
-                    loc.getWorld(), nx, baseLocation.getY(), nz);
+                    loc.getWorld(), nx, baseFinal.getY(), nz);
                 Block floor = patrullaLoc.getBlock();
                 if (floor.getType().isSolid() &&
                     !floor.getRelative(0, 1, 0).getType().isSolid()) {
@@ -385,7 +409,8 @@ public class TrabajoManager {
                     if (p.getLocation().distance(loc) < 5) {
                         sendFrase(npc, Arrays.asList(
                             "Zona bajo vigilancia.",
-                            "Muevete, ciudadano."));
+                            "Muevete, ciudadano.",
+                            "Todo en orden aqui."));
                         break;
                     }
                 }
